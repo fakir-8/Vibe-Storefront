@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
@@ -666,7 +667,7 @@
       <div class="relative mb-4">
         <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         <input id="main-search" type="text" x-model="searchQuery"
-          @input="productsShown = 20"
+          @input="performSearch()"
           placeholder="Search for products…"
           class="w-full pl-12 pr-12 py-4 bg-white border border-base-border rounded-2xl text-base-fg placeholder-base-muted focus:outline-none focus:ring-2 focus:ring-base-accent text-lg shadow-sm" />
         <button @click="closeSearch()" class="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:text-base-accent transition-smooth text-base-muted">
@@ -1868,6 +1869,15 @@
         </template>
       </div>
 
+      <!-- Cloudflare Turnstile -->
+      <div class="px-5 mt-3">
+        <div
+          class="cf-turnstile"
+          data-sitekey="YOUR_TURNSTILE_SITE_KEY"
+          data-callback="onTurnstileSuccess"
+          data-theme="light">
+        </div>
+      </div>
       <!-- Friction Checkbox -->
       <div class="px-5">
         <label class="flex items-start gap-3 bg-base-surface p-3.5 rounded-xl border border-base-border cursor-pointer select-none my-3">
@@ -2215,6 +2225,16 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmamlvdnBzeXBiemt2YWxjdW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjM5ODAsImV4cCI6MjA5NTYzOTk4MH0.QJV1ckOy_VsHTi6DAFebJuzo6EliUr5EmATqLOEo14Q';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // Cloudflare Turnstile callback — must be global
+    function onTurnstileSuccess(token) {
+      // Find the Alpine component and set the token
+      const el = document.querySelector('[x-data]');
+      if (el && el._x_dataStack) {
+        el._x_dataStack[0].turnstileToken = token;
+        el._x_dataStack[0].turnstileVerified = true;
+      }
+    }
+
     function storefront() {
       return {
         /* ---------- DB references ---------- */
@@ -2222,6 +2242,8 @@
         allSubcategories: [],
         allProducts: [],
         allVariants: [],
+        filteredProducts: [],  // ← PATCH 5: server-side search results
+        searchLoading: false,  // ← PATCH 5: search loading state
 
         /* ---------- Session tracking ---------- */
         sessionId: null,
@@ -2289,6 +2311,8 @@
         processingOrder: false,
         reconfirmModalOpen: false,
         finalConfirmCheck: false,
+        turnstileToken: '',
+        turnstileVerified: false,
 
         /* Auth state */
         authModalOpen: false,
@@ -2307,7 +2331,7 @@
         newAddr: { label: '', name: '', phone: '', district: '', details: '' },
 
         /* ---------- Config ---------- */
-        PROMO_CODES: { 'LUXE10': { discount: 0.10, label: '10% off' }, 'SAVE20': { discount: 0.20, label: '20% off' } },
+        // PROMO_CODES removed — now fetched from Supabase promo_codes table
         DISTRICT_DATA: { Dhaka: ['Gulshan','Dhanmondi','Banani','Uttara','Mirpur'], Chittagong: ['Pahartali','Kotwali','Panchlaish'], Sylhet: ['Sadar','South Surma'], Rajshahi: ['Sadar','Paba'] },
         DELIVERY_CONFIG: { type: 'district', flatRate: 120, districtRates: { Dhaka: 60, Chittagong: 120, Sylhet: 120, Rajshahi: 120 } },
 
@@ -2327,7 +2351,8 @@
 
         /* ========== COMPUTED ========== */
         get enrichedProducts() {
-          let prods = this.allProducts.map(p => {
+          // Uses this.filteredProducts which is populated by server-side search
+          let prods = this.filteredProducts.map(p => {
             const cat = this.allCategories.find(c => c.id === p.category_id);
             const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
             const variants = this.allVariants.filter(v => v.product_id === p.id && v.is_active);
@@ -2342,14 +2367,6 @@
             return { ...p, category_name: cat?.name || '', subcategory_name: sub?.name || '', displayPrice, originalPrice, hasDiscount, discountPct };
           });
           if (this.activeCategory !== null) prods = prods.filter(p => p.category_id === this.activeCategory);
-          if (this.searchQuery && this.searchQuery.trim()) {
-            const q = this.searchQuery.trim().toLowerCase();
-            prods = prods.filter(p =>
-              p.title.toLowerCase().includes(q) ||
-              (p.category_name || '').toLowerCase().includes(q) ||
-              (p.subcategory_name || '').toLowerCase().includes(q)
-            );
-          }
           return prods;
         },
         get paginatedProducts() { return this.enrichedProducts.slice(0, this.productsShown); },
@@ -2387,18 +2404,36 @@
         get canPlaceOrder() {
           if (!this.selectedPayment || !this.confirmOrderCheck) return false;
           if (this.selectedPayment === 'cod' && (!this.codPolicy1 || !this.codPolicy2)) return false;
+          // Mobile payment validation: require both number AND transaction ID
+          if (this.selectedPayment === 'bkash') {
+            if (!this.bkashNumber.trim() || !this.bkashTrxId.trim()) return false;
+          }
+          if (this.selectedPayment === 'nagad') {
+            if (!this.nagadNumber.trim() || !this.nagadTrxId.trim()) return false;
+          }
+          if (this.selectedPayment === 'rocket') {
+            if (!this.rocketNumber.trim() || !this.rocketTrxId.trim()) return false;
+          }
           return true;
         },
-        get canFinalConfirm() { return this.finalConfirmCheck; },
+        get canFinalConfirm() { return this.finalConfirmCheck && this.turnstileVerified; },
 
         /* ========== HELPERS ========== */
         formatPrice(amount) { return '৳' + Number(amount).toLocaleString('en-IN'); },
 
         getCartItemDetails(item) {
-          const variant = this.allVariants.find(v => v.id === item.variant_id);
           const product = this.allProducts.find(p => p.id === item.product_id);
-          if (!variant || !product) return { name: 'Unknown', image: '', variant: '', price: 0, discountPct: 0 };
-          const attrStr = Object.entries(variant.variant_attributes || {}).map(([k,v]) => k + ': ' + v).join(' | ');
+          if (!product) return { name: 'Unknown', image: '', variant: '', price: 0, discountPct: 0 };
+
+          // No-variant product: variant_id is null, use product-level data directly
+          if (item.variant_id === null) {
+            return { name: product.title, image: product.main_image || '', variant: '', price: product.base_price, discountPct: 0 };
+          }
+
+          const variant = this.allVariants.find(v => v.id === item.variant_id);
+          if (!variant) return { name: product.title, image: product.main_image || '', variant: '', price: product.base_price, discountPct: 0 };
+
+          const attrStr = Object.entries(variant.variant_attributes || {}).map(([k, v]) => k + ': ' + v).join(' | ');
           const price = variant.discount_price && variant.discount_price < variant.price ? variant.discount_price : variant.price;
           let discountPct = 0;
           if (variant.discount_price && variant.discount_price < variant.price) {
@@ -2429,6 +2464,7 @@
             this.allCategories = catRes.data || [];
             this.allSubcategories = subRes.data || [];
             this.allProducts = prodRes.data || [];
+            this.filteredProducts = prodRes.data || [];  // ← PATCH 5
             this.allVariants = (varRes.data || []).map(v => ({
               ...v,
               variant_attributes: typeof v.variant_attributes === 'string' ? JSON.parse(v.variant_attributes) : v.variant_attributes
@@ -2510,6 +2546,37 @@
           }
         },
 
+        /* ========== SERVER-SIDE SEARCH ========== */
+        _searchDebounceTimer: null,
+        async performSearch() {
+          if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+          this._searchDebounceTimer = setTimeout(async () => {
+            this.searchLoading = true;
+            try {
+              const q = this.searchQuery.trim();
+              let query = supabaseClient
+                .from('products')
+                .select('*')
+                .eq('is_active', true)
+                .order('id');
+
+              if (q) {
+                query = query.ilike('title', `%${q}%`);
+              }
+
+              const { data, error } = await query;
+              if (error) throw error;
+              this.filteredProducts = data || [];
+              this.productsShown = 20;
+            } catch (e) {
+              console.error('Search failed:', e);
+              this.filteredProducts = this.allProducts; // graceful fallback
+            } finally {
+              this.searchLoading = false;
+            }
+          }, 300); // 300ms debounce
+        },
+
         async fetchUserProfile(userId) {
           try {
             const { data, error } = await supabaseClient
@@ -2527,15 +2594,19 @@
 
         /* ========== GUEST-TO-ACCOUNT SYNC ========== */
         async syncGuestDataToAccount(userId) {
+          if (!this.sessionId) return;
           try {
-            await supabaseClient.rpc('sync_guest_to_account', {
+            // The SQL function claims all guest carts + orders under the new user_id
+            const { error } = await supabaseClient.rpc('sync_guest_to_account', {
               p_user_id: userId,
               p_session_id: this.sessionId
             });
-            // Re-fetch cart since it may have been claimed
+            if (error) throw error;
+            // Re-fetch cart so it now reflects the merged/claimed cart
             await this.fetchActiveCart();
           } catch (e) {
-            console.error('Failed to sync guest data:', e);
+            // Non-fatal: log but don't block the login flow
+            console.warn('Guest sync failed (non-fatal):', e.message);
           }
         },
 
@@ -2598,12 +2669,17 @@
           // Auto-save shipping data on every change
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
+
+          // Clear auth errors when switching tabs
+          this.$watch('authTab', () => { this.authError = ''; });
         },
 
         saveToStorage() {
-          localStorage.setItem('vibe_district', this.selectedDistrict);
-          localStorage.setItem('vibe_shipping', JSON.stringify(this.shipping));
-          if (this.userData) localStorage.setItem('vibe_user', JSON.stringify(this.userData));
+          try {
+            if (this.selectedDistrict) localStorage.setItem('vibe_district', this.selectedDistrict);
+            const { name, phone, altPhone, email, upazilla, address } = this.shipping;
+            localStorage.setItem('vibe_shipping', JSON.stringify({ name, phone, altPhone, email, upazilla, address }));
+          } catch (e) { /* localStorage may be unavailable in some browsers */ }
         },
 
         /* ========== SIDEBAR ========== */
@@ -2650,7 +2726,11 @@
         closeSearch() { this.searchOpen = false; this.searchQuery = ''; this.productsShown = 20; },
 
         /* ========== CATEGORY ========== */
-        setCategory(catId) { this.activeCategory = this.activeCategory === catId ? null : catId; this.productsShown = 20; },
+        setCategory(catId) {
+          this.activeCategory = this.activeCategory === catId ? null : catId;
+          this.productsShown = 20;
+          this.performSearch();
+        },
 
         /* ========== VARIANT MODAL ========== */
         openVariantModal(productId) {
@@ -2668,15 +2748,18 @@
           const p = this.allProducts.find(pr => pr.id === productId);
           if (!p) return;
 
-          // For non-variant products, find or create a pseudo variant
-          let variantId = productId; // fallback
+          // CRITICAL FIX: products with no variants must use null for product_variant_id
+          // Using productId as a fake variant_id causes a FK constraint violation.
           const variant = this.allVariants.find(v => v.product_id === productId && v.is_active);
-          if (variant) variantId = variant.id;
+          const variantId = variant ? variant.id : null; // null for no-variant products
 
-          const existing = this.cart.find(c => c.variant_id === variantId);
+          // Match cart lookup key: for no-variant, match by product_id with null variant_id
+          const existing = variantId !== null
+            ? this.cart.find(c => c.variant_id === variantId)
+            : this.cart.find(c => c.product_id === productId && c.variant_id === null);
+
           try {
             if (existing) {
-              // Update qty in Supabase
               const newQty = existing.qty + 1;
               await supabaseClient
                 .from('cart_items')
@@ -2686,13 +2769,12 @@
               existing.selected = true;
               this.cart = [...this.cart];
             } else {
-              // Insert new cart item
               const { data, error } = await supabaseClient
                 .from('cart_items')
                 .insert({
                   cart_id: this.activeCartId,
                   product_id: productId,
-                  product_variant_id: variantId,
+                  product_variant_id: variantId,  // null is valid — FK is nullable
                   qty: 1,
                   selected: true
                 })
@@ -2802,17 +2884,40 @@
           }
         },
 
-        applyPromo() {
+        async applyPromo() {
           const code = this.promoCode.trim().toUpperCase();
           if (!code) { this.promoStatusMsg = 'Please enter a promo code'; this.promoStatusSuccess = false; return; }
-          if (this.PROMO_CODES[code]) {
-            this.promoApplied = { code, ...this.PROMO_CODES[code] };
-            this.promoStatusMsg = 'Promo applied: ' + this.PROMO_CODES[code].label;
+          this.promoStatusMsg = 'Validating…';
+          this.promoStatusSuccess = false;
+          try {
+            const { data, error } = await supabaseClient
+              .from('promo_codes')
+              .select('code, discount_percentage, expiration_date, is_active')
+              .eq('code', code)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (error) throw error;
+            if (!data) {
+              this.promoStatusMsg = 'Invalid or expired promo code';
+              this.promoStatusSuccess = false;
+              return;
+            }
+            // Double-check expiration client-side (RLS already filters, but be safe)
+            if (data.expiration_date && new Date(data.expiration_date) < new Date()) {
+              this.promoStatusMsg = 'This promo code has expired';
+              this.promoStatusSuccess = false;
+              return;
+            }
+            const discount = data.discount_percentage / 100;
+            const label = data.discount_percentage + '% off';
+            this.promoApplied = { code, discount, label };
+            this.promoStatusMsg = 'Promo applied: ' + label;
             this.promoStatusSuccess = true;
-            this.showNotification('Promo applied — ' + this.PROMO_CODES[code].label + '!');
+            this.showNotification('Promo applied — ' + label + '!');
             setTimeout(() => { this.promoStatusMsg = ''; }, 3000);
-          } else {
-            this.promoStatusMsg = 'Invalid promo code';
+          } catch (e) {
+            console.error('Promo validation failed:', e);
+            this.promoStatusMsg = 'Could not validate code. Try again.';
             this.promoStatusSuccess = false;
           }
         },
@@ -2945,7 +3050,10 @@
                 delivery_fee: orderDelivery,
                 discount_amount: orderDiscount,
                 payment_method: this.selectedPayment,
-                payment_info: paymentInfo,
+                payment_info: {
+                  ...paymentInfo,
+                  turnstile_token: this.turnstileToken  // Store for server-side verification if needed
+                },
                 shipping_snapshot: { ...this.shipping, district: this.selectedDistrict },
                 status: 'pending'
               })
@@ -3018,10 +3126,11 @@
 
         /* ========== AUTH ========== */
         async handleSignIn() {
-          if (!this.signInEmail || !this.signInPassword) {
-            this.showNotification('Please enter email and password');
+          if (!this.signInEmail.trim() || !this.signInPassword) {
+            this.authError = 'Please enter your email and password';
             return;
           }
+          this.authError = ''; // Clear previous errors
           this.authLoading = true;
           this.authError = '';
           try {
@@ -3035,52 +3144,72 @@
             this.signInPassword = '';
             this.authModalOpen = false;
           } catch (e) {
-            this.authError = e.message || 'Sign in failed';
-            this.showNotification(this.authError);
+            let msg = e.message || 'Sign in failed';
+            if (msg.includes('Invalid login credentials')) msg = 'Incorrect email or password. Please try again.';
+            if (msg.includes('Email not confirmed')) msg = 'Please confirm your email before signing in.';
+            this.authError = msg;
           } finally {
             this.authLoading = false;
           }
         },
 
         async handleRegister() {
-          if (!this.regName || !this.regEmail || !this.regPassword) {
-            this.showNotification('Please fill in all required fields');
+          // --- Client-side validation ---
+          if (!this.regName.trim() || !this.regEmail.trim() || !this.regPassword) {
+            this.authError = 'Please fill in all required fields';
+            return;
+          }
+          if (this.regPassword.length < 6) {
+            this.authError = 'Password must be at least 6 characters';
             return;
           }
           if (this.regPassword !== this.regConfirmPassword) {
-            this.showNotification('Passwords do not match!');
+            this.authError = 'Passwords do not match';
             return;
           }
+          const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRx.test(this.regEmail.trim())) {
+            this.authError = 'Please enter a valid email address';
+            return;
+          }
+
           this.authLoading = true;
           this.authError = '';
           try {
             const { data, error } = await supabaseClient.auth.signUp({
-              email: this.regEmail,
+              email: this.regEmail.trim(),
               password: this.regPassword,
               options: {
-                data: {
-                  name: this.regName,
-                  phone: this.regPhone
-                }
+                // Pass name & phone in user_metadata — the DB trigger picks these up
+                data: { name: this.regName.trim(), phone: this.regPhone.trim() }
               }
             });
+
             if (error) throw error;
 
-            // Profile is auto-created by the trigger, but we update it with name/phone
-            if (data.user) {
-              await supabaseClient.from('profiles').upsert({
-                id: data.user.id,
-                name: this.regName,
-                phone: this.regPhone,
-                email: this.regEmail
-              });
+            // IMPORTANT: Do NOT attempt a profiles.upsert here.
+            // The on_auth_user_created trigger handles profile creation automatically.
+            // A manual upsert here fails if email confirmation is required (session is null).
+
+            if (data.user && !data.session) {
+              // Email confirmation required — user created but not yet signed in
+              this.showNotification('Account created! Please check your email to confirm.');
+              this.authTab = 0; // Switch to sign-in tab
+            } else if (data.session) {
+              // Email confirmation disabled — user is immediately signed in
+              this.showNotification('Account created! Welcome to Vibe.');
+              this.authModalOpen = false;
             }
 
-            this.showNotification('Account created! Check your email to confirm.');
-            this.regName = ''; this.regEmail = ''; this.regPhone = ''; this.regPassword = ''; this.regConfirmPassword = '';
+            // Reset form
+            this.regName = ''; this.regEmail = ''; this.regPhone = '';
+            this.regPassword = ''; this.regConfirmPassword = '';
           } catch (e) {
-            this.authError = e.message || 'Registration failed';
-            this.showNotification(this.authError);
+            // Surface clean errors to the user
+            let msg = e.message || 'Registration failed';
+            if (msg.includes('already registered')) msg = 'This email is already registered. Try signing in.';
+            if (msg.includes('Password should be')) msg = 'Password must be at least 6 characters.';
+            this.authError = msg;
           } finally {
             this.authLoading = false;
           }
