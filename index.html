@@ -525,7 +525,7 @@
   <aside class="cart-drawer" :class="{'open': cartDrawerOpen}" role="dialog" aria-label="Shopping cart"
          @mouseenter="stopCartAutoClose()" @mousemove="stopCartAutoClose()"
          @touchstart="stopCartAutoClose()" @click="stopCartAutoClose()"
-         @mouseleave="resetCartAutoClose()" @touchend="resetCartAutoClose()" @scroll="resetCartAutoClose()">
+         @mouseleave="resetCartAutoClose()" @touchend="resetCartAutoClose()">
     <!-- Header -->
     <div class="flex items-center justify-between px-5 py-4 border-b border-base-border flex-shrink-0">
       <div class="flex items-center gap-2">
@@ -544,6 +544,7 @@
         <svg class="w-14 h-14 mx-auto text-base-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
         <p class="text-base-muted font-medium mb-1">Your cart is empty</p>
         <p class="text-xs text-base-muted">Add items to get started</p>
+        <button @click="closeCartDrawer(); goHome();" class="mt-4 px-5 py-2.5 rounded-xl bg-base-fg text-white text-sm font-semibold hover:bg-base-fg/90 transition-smooth btn-press">Browse Products</button>
       </div>
 
       <!-- Cart item list -->
@@ -729,6 +730,17 @@
           <button @click="openCartDrawer()" class="hidden lg:flex p-2 rounded-xl hover:bg-base-surface transition-smooth relative" aria-label="Cart">
             <svg class="w-5 h-5 text-base-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
             <span x-show="cartItemCount > 0" class="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-base-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center" x-text="cartItemCount"></span>
+          </button>
+          <!-- Account (desktop) -->
+          <button @click="authModalOpen = true"
+                  class="hidden lg:flex p-2 rounded-xl hover:bg-base-surface transition-smooth relative items-center gap-1.5"
+                  aria-label="Account">
+            <svg class="w-5 h-5 text-base-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            <span x-show="isLoggedIn"
+                  class="absolute top-1.5 right-1.5 w-2 h-2 bg-base-success rounded-full border-2 border-white"></span>
           </button>
           <!-- Hamburger -->
           <button @click="openSidebar()" class="p-2 rounded-xl hover:bg-base-surface transition-smooth" aria-label="Menu">
@@ -1391,6 +1403,14 @@
               </div>
             </div>
 
+            <div x-show="isLoggedIn && savedAddresses.length > 0 && shipping.name"
+                 class="mb-3 flex items-center gap-2 px-3 py-2 bg-base-success/10 rounded-xl text-xs font-medium text-base-success">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Shipping details prefilled from your saved address. You can edit below.
+            </div>
+
             <div class="bg-base-card rounded-2xl border border-base-border p-5 md:p-6 space-y-4">
               <div>
                 <label class="block text-sm font-semibold text-base-fg mb-1.5">Full Name *</label>
@@ -1733,6 +1753,7 @@
 
           <div class="mt-8 text-center phase-enter">
             <button @click="continueShopping()" class="px-8 py-3.5 rounded-xl bg-base-fg text-white font-semibold hover:bg-base-fg/90 transition-smooth btn-press shadow-lg">Continue Shopping</button>
+            <button x-show="isLoggedIn" @click="viewJustPlacedOrder()" class="px-6 py-2.5 rounded-xl border border-base-fg text-base-fg font-semibold text-sm hover:bg-base-surface transition-smooth btn-press">View Order Details</button>
           </div>
         </div>
 
@@ -1742,7 +1763,7 @@
       <div x-show="checkoutStep < 3" class="fixed bottom-0 left-0 right-0 z-[90] bg-white/95 backdrop-blur-xl border-t border-base-border" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
         <div class="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
           <div>
-            <p class="text-xs text-base-muted font-medium">Total</p>
+            <p class="text-xs text-base-muted font-medium" x-text="(cartSelectedCount > 0 ? cartSelectedCount + ' items' : '') + (selectedDistrict ? ' · ' + selectedDistrict : '')"></p>
             <p class="font-display font-bold text-lg text-base-fg" x-text="(cartSelectedCount > 0 && selectedDistrict) ? formatPrice(cartTotal) : '—'"></p>
           </div>
           <!-- Step 1 buttons: Shipping -->
@@ -1950,14 +1971,26 @@
           <div class="p-5 overflow-y-auto custom-scroll" style="max-height:calc(90vh - 140px);">
             <!-- Sign In -->
             <div x-show="authTab === 0" class="space-y-3">
+              <!-- Success message -->
+              <div x-show="authSuccessMsg" x-transition
+                   class="bg-base-success/10 border border-base-success/30 rounded-xl p-3 flex items-start gap-2">
+                <svg class="w-4 h-4 text-base-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span class="text-xs font-medium text-base-success" x-text="authSuccessMsg"></span>
+              </div>
               <!-- Error message -->
               <div x-show="authError" x-transition class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
                 <svg class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-xs font-medium text-red-600" x-text="authError"></span>
               </div>
+              <!-- Cooldown timer -->
+              <div x-show="signInCooldownRemaining > 0" class="mt-2 text-xs font-mono font-bold text-red-600">
+                Cooldown: <span x-text="signInCooldownRemaining"></span>s
+              </div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Email Address</label><input x-model="signInEmail" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><input x-model="signInPassword" type="password" placeholder="Enter password" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
-              <button @click="handleSignIn()" :disabled="authLoading" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50 flex items-center justify-center gap-2">
+              <button @click="handleSignIn()" :disabled="authLoading || signInCooldownUntil > Date.now()" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50 flex items-center justify-center gap-2">
                 <svg x-show="authLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 <span x-text="authLoading ? 'Signing in...' : 'Sign In'"></span>
               </button>
@@ -1984,7 +2017,46 @@
               <div class="bg-base-surface rounded-xl p-3 mb-2"><p class="text-xs text-base-muted leading-relaxed">Track your guest order from any device.</p></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Order ID</label><input x-model="trackOrderId" type="text" placeholder="#VBE-00000" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Phone Number</label><input x-model="trackPhone" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
-              <button @click="trackGuestOrder()" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press">Track Status</button>
+              <button @click="trackGuestOrder()" :disabled="authLoading" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50">Track Status</button>
+              <div x-show="trackOrderError" class="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-medium" x-text="trackOrderError"></div>
+              <template x-if="trackedOrder">
+                <div class="bg-base-surface rounded-2xl border border-base-border p-4 space-y-3">
+                  <div class="flex justify-between items-center">
+                    <span class="font-bold text-sm text-base-fg" x-text="'#' + trackedOrder.order.order_number"></span>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                          :class="{
+                            'bg-amber-100 text-amber-700': trackedOrder.order.status === 'pending',
+                            'bg-blue-100 text-blue-700': trackedOrder.order.status === 'confirmed',
+                            'bg-purple-100 text-purple-700': trackedOrder.order.status === 'packaged',
+                            'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(trackedOrder.order.status),
+                            'bg-red-100 text-red-600': trackedOrder.order.status === 'cancelled'
+                          }"
+                          x-text="trackedOrder.order.status"></span>
+                  </div>
+                  <div class="space-y-1">
+                    <template x-for="step in ['pending','confirmed','packaged','shipped','delivered']" :key="step">
+                      <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full flex-shrink-0"
+                             :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) >= ['pending','confirmed','packaged','shipped','delivered'].indexOf(step) ? 'bg-base-success' : 'bg-base-border'"></div>
+                        <span class="text-xs capitalize" x-text="step"
+                              :class="trackedOrder.order.status === step ? 'font-bold text-base-fg' : 'text-base-muted'"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="space-y-1 border-t border-base-border pt-2">
+                    <template x-for="item in (trackedOrder.items || [])" :key="item.id">
+                      <div class="flex justify-between text-xs">
+                        <span class="text-base-muted" x-text="item.product_title + (item.variant_label ? ' — ' + item.variant_label : '') + ' × ' + item.qty"></span>
+                        <span class="font-semibold text-base-fg" x-text="formatPrice(item.price_at_purchase * item.qty)"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="border-t border-base-border pt-2 flex justify-between text-sm font-bold">
+                    <span>Total</span>
+                    <span x-text="formatPrice(trackedOrder.order.total)"></span>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -2017,12 +2089,119 @@
             <!-- Orders tab -->
             <div x-show="dashTab === 'orders'">
               <h3 class="font-bold text-sm text-base-fg mb-4">My Orders</h3>
-              <div x-show="orders.length === 0" class="text-center py-8"><p class="text-base-muted text-sm">No orders yet</p></div>
+              <div x-show="ordersLoading" class="text-center py-8">
+                <div class="w-6 h-6 border-2 border-base-border border-t-base-fg rounded-full animate-spin mx-auto"></div>
+              </div>
+              <div x-show="!ordersLoading && orders.length === 0" class="text-center py-8">
+                <svg class="w-10 h-10 text-base-border mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-base-muted text-sm font-medium">No orders yet</p>
+                <button @click="authModalOpen = false; goHome();" class="mt-3 text-xs text-base-accent underline">Start Shopping</button>
+              </div>
               <div class="space-y-3">
-                <template x-for="(order, idx) in orders" :key="idx">
-                  <div class="bg-base-surface rounded-xl p-4">
-                    <div class="flex justify-between items-center mb-2"><span class="font-bold text-sm text-base-fg" x-text="order.id"></span><span class="text-xs text-base-muted" x-text="order.date"></span></div>
-                    <p class="text-xs text-base-muted" x-text="order.items.length + ' items — ' + order.paymentMethod"></p>
+                <template x-for="order in orders" :key="order.id">
+                  <div class="bg-base-surface rounded-xl overflow-hidden border border-base-border">
+                    <button @click="toggleOrderDetail(order.id)"
+                            class="w-full p-4 text-left hover:bg-base-border/20 transition-smooth">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-sm text-base-fg" x-text="order.id"></span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                                  :class="{
+                                    'bg-amber-100 text-amber-700': order.status === 'pending',
+                                    'bg-blue-100 text-blue-700': order.status === 'confirmed',
+                                    'bg-purple-100 text-purple-700': order.status === 'packaged',
+                                    'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(order.status),
+                                    'bg-red-100 text-red-600': order.status === 'cancelled'
+                                  }"
+                                  x-text="order.status || 'pending'"></span>
+                          </div>
+                          <p class="text-xs text-base-muted"
+                             x-text="order.date + ' · ' + (order.items?.length || 0) + ' item' + ((order.items?.length || 0) !== 1 ? 's' : '') + ' · ' + (order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod?.toUpperCase())"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="font-display font-bold text-sm text-base-fg" x-text="formatPrice(order.total)"></span>
+                          <svg class="w-4 h-4 text-base-muted transition-smooth"
+                               :style="expandedOrderId === order.id ? 'transform:rotate(180deg)' : ''"
+                               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                    <div x-show="expandedOrderId === order.id"
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-1"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="border-t border-base-border p-4 space-y-4">
+                      <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Delivery Status</p>
+                        <div class="flex items-center gap-0">
+                          <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="step">
+                            <div class="flex items-center flex-1 last:flex-none">
+                              <div class="flex flex-col items-center">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
+                                     :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') >= idx
+                                       ? 'bg-base-success text-white'
+                                       : 'bg-base-border text-base-muted'">
+                                  <svg x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') > idx"
+                                       class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                  </svg>
+                                  <span x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') <= idx"
+                                        x-text="idx + 1"></span>
+                                </div>
+                                <span class="text-[9px] mt-1 text-center capitalize leading-tight"
+                                      :class="order.status === step ? 'font-bold text-base-fg' : 'text-base-muted'"
+                                      x-text="step"></span>
+                              </div>
+                              <div x-show="idx < 4"
+                                   class="flex-1 h-0.5 mx-1 mb-3"
+                                   :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') > idx
+                                     ? 'bg-base-success' : 'bg-base-border'"></div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div x-show="order.items && order.items.length > 0">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Items</p>
+                        <div class="space-y-2">
+                          <template x-for="item in (order.items || [])" :key="item.id || item.product_id">
+                            <div class="flex items-center gap-3">
+                              <div class="w-10 h-10 rounded-lg overflow-hidden bg-base-surface flex-shrink-0">
+                                <img :src="item.details?.image || item.variant_image || ''"
+                                     :alt="item.details?.name || item.product_title"
+                                     class="w-full h-full object-cover"
+                                     onerror="this.style.display='none'">
+                              </div>
+                              <div class="flex-1 min-w-0">
+                                <p class="text-xs font-medium text-base-fg truncate"
+                                   x-text="item.details?.name || item.product_title"></p>
+                                <p class="text-[11px] text-base-muted"
+                                   x-text="(item.details?.variant || item.variant_label || '') + ' × ' + item.qty"></p>
+                              </div>
+                              <p class="text-xs font-bold text-base-fg flex-shrink-0"
+                                 x-text="formatPrice((item.details?.price || item.price_at_purchase) * item.qty)"></p>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="border-t border-base-border pt-3 space-y-1 text-xs">
+                        <div class="flex justify-between"><span class="text-base-muted">Subtotal</span><span x-text="formatPrice(order.subtotal || order.total)"></span></div>
+                        <div class="flex justify-between" x-show="(order.delivery || 0) > 0"><span class="text-base-muted">Delivery</span><span x-text="formatPrice(order.delivery || 0)"></span></div>
+                        <div class="flex justify-between text-base-success" x-show="(order.delivery || 0) === 0"><span>Delivery</span><span>Free</span></div>
+                        <div class="flex justify-between text-base-success" x-show="(order.discount || 0) > 0"><span>Discount</span><span x-text="'-' + formatPrice(order.discount || 0)"></span></div>
+                        <div class="flex justify-between font-bold border-t border-base-border pt-1"><span>Total</span><span x-text="formatPrice(order.total)"></span></div>
+                      </div>
+                      <div x-show="order.shipping" class="bg-base-card rounded-xl p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-1">Shipped To</p>
+                        <p class="text-xs font-semibold text-base-fg" x-text="order.shipping?.name || ''"></p>
+                        <p class="text-xs text-base-muted" x-text="order.shipping?.phone || ''"></p>
+                        <p class="text-xs text-base-muted" x-text="(order.shipping?.address || '') + (order.shipping?.upazilla ? ', ' + order.shipping.upazilla : '') + (order.shipping?.district ? ', ' + order.shipping.district : '')"></p>
+                      </div>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -2040,9 +2219,22 @@
               <div class="flex items-center justify-between mb-4"><h3 class="font-bold text-sm text-base-fg">Saved Addresses</h3><button @click="showAddAddr = true" class="px-3 py-1.5 rounded-lg bg-base-success/10 text-base-success text-xs font-semibold hover:bg-base-success/20 transition-smooth">+ Add New</button></div>
               <div class="space-y-3">
                 <template x-for="(addr, idx) in savedAddresses" :key="idx">
-                  <div class="bg-base-surface rounded-xl p-3 flex justify-between items-start">
-                    <div><p class="text-xs font-bold text-base-success mb-0.5" x-text="addr.label"></p><p class="text-sm font-medium text-base-fg" x-text="addr.name"></p><p class="text-xs text-base-muted" x-text="addr.details"></p></div>
-                    <button @click="savedAddresses.splice(idx, 1); saveToStorage();" class="text-xs text-red-400 hover:text-red-600">Remove</button>
+                  <div class="bg-base-surface rounded-xl p-3">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="text-xs font-bold text-base-success mb-0.5" x-text="addr.label"></p>
+                        <p class="text-sm font-medium text-base-fg" x-text="addr.name"></p>
+                        <p class="text-xs text-base-muted" x-text="addr.details"></p>
+                      </div>
+                    </div>
+                    <div class="flex gap-2 mt-1">
+                      <button x-show="!addr.is_default" @click="setDefaultAddress(addr.id)" class="text-xs text-base-success font-semibold hover:underline">Set as Default</button>
+                      <span x-show="addr.is_default" class="text-xs font-bold text-base-success flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        Default
+                      </span>
+                      <button @click="deleteAddress(addr.id, idx)" class="text-xs text-red-400 hover:text-red-600 ml-auto">Remove</button>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -2316,12 +2508,22 @@
         regName: '', regEmail: '', regPhone: '', regPassword: '', regConfirmPassword: '',
         authLoading: false,
         authError: '',
+        signInAttempts: 0,
+        signInCooldownUntil: 0,
+        signInCooldownRemaining: 0,
+        _cooldownInterval: null,
+        authSuccessMsg: '',
         trackOrderId: '', trackPhone: '',
+        trackedOrder: null,
+        trackOrderError: '',
         dashTab: 'orders',
         orders: [],
+        expandedOrderId: null,
+        ordersLoading: false,
         savedAddresses: [],
         showAddAddr: false,
         newAddr: { label: '', name: '', phone: '', district: '', details: '' },
+        _authInitialized: false,
 
         /* ---------- Config ---------- */
         // PROMO_CODES removed — now fetched from Supabase promo_codes table
@@ -2370,8 +2572,14 @@
         get totalItems() { return Object.values(this.cartItems).reduce((s, i) => s + (i.qty || 0), 0); },
         get totalPrice() { return Object.values(this.cartItems).reduce((s, i) => s + ((i.effectivePrice || 0) * (i.qty || 0)), 0); },
         get pdpPriceRange() {
-          if (!this.pdpVariants.length) { const base = this.pdpProduct?.base_price || 0; return { min: base, max: base }; }
-          const prices = this.pdpVariants.map(v => v.effectivePrice);
+          if (!this.pdpVariants?.length) {
+            const base = this.pdpProduct?.base_price || 0;
+            return { min: base, max: base };
+          }
+          const prices = this.pdpVariants
+            .map(v => typeof v.effectivePrice === 'number' ? v.effectivePrice : (v.discount_price && v.discount_price < v.price ? v.discount_price : v.price))
+            .filter(p => !isNaN(p) && p > 0);
+          if (!prices.length) return { min: 0, max: 0 };
           return { min: Math.min(...prices), max: Math.max(...prices) };
         },
 
@@ -2413,6 +2621,13 @@
 
         /* ========== HELPERS ========== */
         formatPrice(amount) { return '৳' + Number(amount).toLocaleString('en-IN'); },
+
+        formatPhoneInput(value) {
+          const digits = value.replace(/\D/g, '').slice(0, 11);
+          if (digits.length > 7) return digits.slice(0, 3) + ' ' + digits.slice(3, 7) + ' ' + digits.slice(7);
+          if (digits.length > 3) return digits.slice(0, 3) + ' ' + digits.slice(3);
+          return digits;
+        },
 
         getCartItemDetails(item) {
           const product = this.allProducts.find(p => p.id === item.product_id);
@@ -2498,6 +2713,7 @@
 
         async fetchUserOrders() {
           if (!this.userData?.id) return;
+          this.ordersLoading = true;
           try {
             const { data, error } = await supabaseClient
               .from('orders')
@@ -2507,20 +2723,35 @@
             if (error) throw error;
             this.orders = (data || []).map(o => ({
               id: o.order_number,
-              date: new Date(o.created_at).toLocaleDateString(),
+              dbId: o.id,
+              date: new Date(o.created_at).toLocaleDateString('en-BD', { year: 'numeric', month: 'short', day: 'numeric' }),
               total: o.total,
               subtotal: o.subtotal,
               delivery: o.delivery_fee,
               discount: o.discount_amount,
               paymentMethod: o.payment_method,
+              status: o.status,
               shipping: o.shipping_snapshot,
               items: (o.order_items || []).map(oi => ({
-                ...oi,
-                details: { name: oi.product_title, image: oi.variant_image, variant: oi.variant_label, price: oi.price_at_purchase, discountPct: 0 }
+                id: oi.id,
+                product_id: oi.product_id,
+                product_title: oi.product_title,
+                variant_label: oi.variant_label,
+                variant_image: oi.variant_image,
+                price_at_purchase: oi.price_at_purchase,
+                qty: oi.qty,
+                details: {
+                  name: oi.product_title,
+                  image: oi.variant_image || '',
+                  variant: oi.variant_label || '',
+                  price: oi.price_at_purchase
+                }
               }))
             }));
           } catch (e) {
             console.error('Failed to fetch orders:', e);
+          } finally {
+            this.ordersLoading = false;
           }
         },
 
@@ -2605,66 +2836,56 @@
 
         /* ========== INIT ========== */
         async init() {
-          // Generate/load session ID for guest tracking
           this.generateSessionId();
-
-          // Fetch catalog from Supabase
           await this.fetchCatalog();
-
-          // Restore UI state from localStorage
           try {
             const savedDistrict = localStorage.getItem('vibe_district');
             if (savedDistrict) this.selectedDistrict = savedDistrict;
-            const savedShipping = JSON.parse(localStorage.getItem('vibe_shipping'));
+            const savedShipping = JSON.parse(localStorage.getItem('vibe_shipping') || 'null');
             if (savedShipping) this.shipping = { ...this.shipping, ...savedShipping };
           } catch(e) {}
 
-          // Listen for auth state changes
+          const { data: { session: existingSession } } = await supabaseClient.auth.getSession();
+          if (existingSession?.user) {
+            await this._handleAuthUser(existingSession.user);
+          } else {
+            await this.fetchActiveCart();
+          }
+          this._authInitialized = true;
+
           supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user) {
-              this.isLoggedIn = true;
-              const profile = await this.fetchUserProfile(session.user.id);
-              this.userData = {
-                id: session.user.id,
-                name: profile?.name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-                email: profile?.email || session.user.email,
-                phone: profile?.phone || session.user.user_metadata?.phone || ''
-              };
-              await this.syncGuestDataToAccount(session.user.id);
-              await this.fetchUserOrders();
-              await this.fetchSavedAddresses();
-            } else {
+            if (!this._authInitialized) return;
+            if (session?.user && event === 'SIGNED_IN') {
+              await this._handleAuthUser(session.user);
+            } else if (event === 'SIGNED_OUT') {
               this.isLoggedIn = false;
               this.userData = null;
+              this.orders = [];
+              this.savedAddresses = [];
+              await this.fetchActiveCart();
             }
-            // Always re-fetch cart after auth change
-            await this.fetchActiveCart();
           });
 
-          // Check existing session
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          if (session?.user) {
-            this.isLoggedIn = true;
-            const profile = await this.fetchUserProfile(session.user.id);
-            this.userData = {
-              id: session.user.id,
-              name: profile?.name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-              email: profile?.email || session.user.email,
-              phone: profile?.phone || session.user.user_metadata?.phone || ''
-            };
-            await this.fetchUserOrders();
-            await this.fetchSavedAddresses();
-          }
-
-          // Fetch cart (after session check, so activeCartId gets set properly)
-          await this.fetchActiveCart();
-
-          // Auto-save shipping data on every change
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
+          this.$watch('authTab', () => { this.authError = ''; this.authSuccessMsg = ''; });
+        },
 
-          // Clear auth errors when switching tabs
-          this.$watch('authTab', () => { this.authError = ''; });
+        async _handleAuthUser(user) {
+          const profile = await this.fetchUserProfile(user.id);
+          this.userData = {
+            id: user.id,
+            name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            email: profile?.email || user.email || '',
+            phone: profile?.phone || user.user_metadata?.phone || ''
+          };
+          this.isLoggedIn = true;
+          await this.syncGuestDataToAccount(user.id);
+          await Promise.all([
+            this.fetchUserOrders(),
+            this.fetchSavedAddresses(),
+            this.fetchActiveCart()
+          ]);
         },
 
         saveToStorage() {
@@ -2722,7 +2943,6 @@
         setCategory(catId) {
           this.activeCategory = this.activeCategory === catId ? null : catId;
           this.productsShown = 20;
-          this.performSearch();
         },
 
         /* ========== VARIANT MODAL ========== */
@@ -2737,27 +2957,45 @@
           this.showModal = true; document.body.style.overflow = 'hidden';
         },
 
+        async ensureActiveCart() {
+          if (this.activeCartId) return true;
+          try {
+            const userId = this.userData?.id || null;
+            const { data, error } = await supabaseClient.rpc('get_or_create_cart', {
+              p_user_id: userId,
+              p_session_id: this.sessionId
+            });
+            if (error) throw error;
+            this.activeCartId = data;
+            return true;
+          } catch (e) {
+            console.error('Could not create/get cart:', e);
+            return false;
+          }
+        },
+
         async triggerAddToCart(productId) {
           const p = this.allProducts.find(pr => pr.id === productId);
           if (!p) return;
-
-          // CRITICAL FIX: products with no variants must use null for product_variant_id
-          // Using productId as a fake variant_id causes a FK constraint violation.
+          const cartReady = await this.ensureActiveCart();
+          if (!cartReady) {
+            this.showNotification('Could not initialize cart. Please refresh and try again.');
+            return;
+          }
           const variant = this.allVariants.find(v => v.product_id === productId && v.is_active);
-          const variantId = variant ? variant.id : null; // null for no-variant products
-
-          // Match cart lookup key: for no-variant, match by product_id with null variant_id
-          const existing = variantId !== null
-            ? this.cart.find(c => c.variant_id === variantId)
-            : this.cart.find(c => c.product_id === productId && c.variant_id === null);
-
+          const variantId = variant ? variant.id : null;
+          const vId = variantId ?? null;
+          const existing = vId !== null
+            ? this.cart.find(c => (c.variant_id ?? null) === vId)
+            : this.cart.find(c => (c.variant_id ?? null) === null && c.product_id === productId);
           try {
             if (existing) {
               const newQty = existing.qty + 1;
-              await supabaseClient
+              const { error } = await supabaseClient
                 .from('cart_items')
                 .update({ qty: newQty, selected: true })
                 .eq('id', existing.cart_item_id);
+              if (error) throw error;
               existing.qty = newQty;
               existing.selected = true;
               this.cart = [...this.cart];
@@ -2767,7 +3005,7 @@
                 .insert({
                   cart_id: this.activeCartId,
                   product_id: productId,
-                  product_variant_id: variantId,  // null is valid — FK is nullable
+                  product_variant_id: variantId,
                   qty: 1,
                   selected: true
                 })
@@ -2785,8 +3023,8 @@
             this.showNotification('Added to cart!');
             this.openCartDrawer(true);
           } catch (e) {
-            console.error('Add to cart failed:', e);
-            this.showNotification('Failed to add to cart');
+            console.error('Add to cart failed:', e.message, e);
+            this.showNotification('Failed to add to cart. Please try again.');
           }
         },
 
@@ -2800,14 +3038,19 @@
 
         async confirmAddToCart() {
           const items = Object.entries(this.cartItems).filter(([id, data]) => data.qty > 0);
+          const cartReady = await this.ensureActiveCart();
+          if (!cartReady) {
+            this.showNotification('Could not initialize cart. Please refresh and try again.');
+            return;
+          }
           try {
             for (const [variantId, data] of items) {
               const variant = this.modalVariants.find(v => v.id == variantId);
-              // For variant products, match by variant_id; for no-variant products, match by product_id + null variant_id
-              const existing = variantId != null
-                ? this.cart.find(c => c.variant_id == variantId)
-                : this.cart.find(c => c.variant_id === null && c.product_id === variant?.product_id);
-
+              const vId = variantId != null ? Number(variantId) : null;
+              const existing = this.cart.find(c => {
+                const cVid = c.variant_id ?? null;
+                return vId !== null ? cVid === vId : (cVid === null && c.product_id === variant?.product_id);
+              });
               if (existing) {
                 const newQty = existing.qty + data.qty;
                 await supabaseClient
@@ -2822,7 +3065,7 @@
                   .insert({
                     cart_id: this.activeCartId,
                     product_id: variant.product_id,
-                    product_variant_id: variantId != null ? Number(variantId) : null,
+                    product_variant_id: vId,
                     qty: data.qty,
                     selected: true
                   })
@@ -2831,7 +3074,7 @@
                 if (error) throw error;
                 this.cart.push({
                   product_id: variant.product_id,
-                  variant_id: variantId != null ? Number(variantId) : null,
+                  variant_id: vId,
                   qty: data.qty,
                   selected: true,
                   cart_item_id: inserted.id
@@ -2851,10 +3094,11 @@
 
         /* ========== CART MANAGEMENT ========== */
         async removeFromCart(variantId, productId) {
-          // Match by cart_item_id for reliable removal when variant_id is null
-          const item = this.cart.find(c =>
-            variantId !== null ? c.variant_id === variantId : (c.variant_id === null && c.product_id === productId)
-          );
+          const vId = variantId ?? null;
+          const item = this.cart.find(c => {
+            const cVid = c.variant_id ?? null;
+            return vId !== null ? cVid === vId : (cVid === null && c.product_id === productId);
+          });
           if (!item) return;
           try {
             await supabaseClient.from('cart_items').delete().eq('id', item.cart_item_id);
@@ -2867,9 +3111,11 @@
         },
 
         async updateCartQty(variantId, delta, productId) {
-          const item = this.cart.find(c =>
-            variantId !== null ? c.variant_id === variantId : (c.variant_id === null && c.product_id === productId)
-          );
+          const vId = variantId ?? null;
+          const item = this.cart.find(c => {
+            const cVid = c.variant_id ?? null;
+            return vId !== null ? cVid === vId : (cVid === null && c.product_id === productId);
+          });
           if (!item) return;
           const newQty = Math.max(1, item.qty + delta);
           try {
@@ -2893,7 +3139,7 @@
           try {
             const { data, error } = await supabaseClient
               .from('promo_codes')
-              .select('code, discount_percentage, expiration_date, is_active')
+              .select('code, discount_percentage, expiration_date, is_active, min_order_amount, max_uses, use_count')
               .eq('code', code)
               .eq('is_active', true)
               .maybeSingle();
@@ -2903,9 +3149,18 @@
               this.promoStatusSuccess = false;
               return;
             }
-            // Double-check expiration client-side (RLS already filters, but be safe)
             if (data.expiration_date && new Date(data.expiration_date) < new Date()) {
               this.promoStatusMsg = 'This promo code has expired';
+              this.promoStatusSuccess = false;
+              return;
+            }
+            if (data.min_order_amount && this.cartSubtotal < data.min_order_amount) {
+              this.promoStatusMsg = `Minimum order of ${this.formatPrice(data.min_order_amount)} required for this code.`;
+              this.promoStatusSuccess = false;
+              return;
+            }
+            if (data.max_uses && data.use_count >= data.max_uses) {
+              this.promoStatusMsg = 'This promo code has reached its usage limit.';
               this.promoStatusSuccess = false;
               return;
             }
@@ -2933,6 +3188,21 @@
         proceedToCheckout() {
           if (this.cartSelectedCount === 0 || !this.selectedDistrict) return;
           this.closeCartDrawer();
+          if (this.isLoggedIn && this.savedAddresses.length > 0) {
+            const defaultAddr = this.savedAddresses.find(a => a.is_default)
+                             || (this.savedAddresses.length === 1 ? this.savedAddresses[0] : null)
+                             || this.savedAddresses[0];
+            if (defaultAddr) {
+              if (!this.shipping.name.trim()) this.shipping.name = defaultAddr.name || '';
+              if (!this.shipping.phone.trim()) this.shipping.phone = defaultAddr.phone || '';
+              if (!this.shipping.address.trim()) this.shipping.address = defaultAddr.details || '';
+              if (!this.shipping.upazilla && defaultAddr.upazilla) this.shipping.upazilla = defaultAddr.upazilla;
+              if (!this.selectedDistrict && defaultAddr.district) this.selectedDistrict = defaultAddr.district;
+            }
+          } else if (this.isLoggedIn && this.userData) {
+            if (!this.shipping.name.trim()) this.shipping.name = this.userData.name || '';
+            if (!this.shipping.phone.trim()) this.shipping.phone = this.userData.phone || '';
+          }
           this.currentView = 'checkout';
           this.checkoutStep = 1;
           this.checkoutValidationMsg = '';
@@ -3131,35 +3401,76 @@
 
         /* ========== AUTH ========== */
         async handleSignIn() {
-          if (!this.signInEmail.trim() || !this.signInPassword) {
-            this.authError = 'Please enter your email and password';
+          const now = Date.now();
+          if (this.signInCooldownUntil > now) {
+            const remaining = Math.ceil((this.signInCooldownUntil - now) / 1000);
+            this.authError = `Too many attempts. Please wait ${remaining}s before trying again.`;
             return;
           }
-          this.authError = ''; // Clear previous errors
+          if (!this.signInEmail.trim() || !this.signInPassword) {
+            this.authError = 'Please enter your email and password.';
+            return;
+          }
           this.authLoading = true;
           this.authError = '';
           try {
             const { data, error } = await supabaseClient.auth.signInWithPassword({
-              email: this.signInEmail,
+              email: this.signInEmail.trim(),
               password: this.signInPassword
             });
             if (error) throw error;
+            this.signInAttempts = 0;
+            this.signInCooldownUntil = 0;
             this.showNotification('Signed in successfully!');
             this.signInEmail = '';
             this.signInPassword = '';
             this.authModalOpen = false;
           } catch (e) {
+            this.signInAttempts++;
             let msg = e.message || 'Sign in failed';
-            if (msg.includes('Invalid login credentials')) msg = 'Incorrect email or password. Please try again.';
-            if (msg.includes('Email not confirmed')) msg = 'Please confirm your email before signing in.';
+            if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid_credentials')) {
+              const remaining = 5 - this.signInAttempts;
+              if (remaining > 0) {
+                msg = `Incorrect email or password. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`;
+              } else {
+                this.signInCooldownUntil = Date.now() + 60000;
+                this.signInAttempts = 0;
+                msg = 'Too many failed attempts. Please wait 60 seconds before trying again.';
+                this._startCooldownTimer();
+              }
+            } else if (msg.toLowerCase().includes('email not confirmed')) {
+              msg = 'Please check your email and click the confirmation link before signing in.';
+            } else if (msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too_many') || msg.toLowerCase().includes('over_email')) {
+              this.signInCooldownUntil = Date.now() + 60000;
+              this._startCooldownTimer();
+              msg = 'Too many sign-in attempts. Please wait 60 seconds and try again.';
+            } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+              msg = 'Network error. Please check your connection and try again.';
+            }
             this.authError = msg;
           } finally {
             this.authLoading = false;
           }
         },
 
+        _startCooldownTimer() {
+          if (this._cooldownInterval) clearInterval(this._cooldownInterval);
+          this._cooldownInterval = setInterval(() => {
+            const remaining = Math.ceil((this.signInCooldownUntil - Date.now()) / 1000);
+            if (remaining <= 0) {
+              clearInterval(this._cooldownInterval);
+              this.signInCooldownRemaining = 0;
+              if (this.authError.includes('wait')) this.authError = '';
+            } else {
+              this.signInCooldownRemaining = remaining;
+              if (this.signInCooldownUntil > Date.now()) {
+                this.authError = `Too many attempts. Please wait ${remaining}s before trying again.`;
+              }
+            }
+          }, 1000);
+        },
+
         async handleRegister() {
-          // --- Client-side validation ---
           if (!this.regName.trim() || !this.regEmail.trim() || !this.regPassword) {
             this.authError = 'Please fill in all required fields';
             return;
@@ -3177,7 +3488,6 @@
             this.authError = 'Please enter a valid email address';
             return;
           }
-
           this.authLoading = true;
           this.authError = '';
           try {
@@ -3185,37 +3495,33 @@
               email: this.regEmail.trim(),
               password: this.regPassword,
               options: {
-                // Pass name & phone in user_metadata — the DB trigger picks these up
                 data: { name: this.regName.trim(), phone: this.regPhone.trim() }
               }
             });
-
             if (error) throw error;
-
-            // IMPORTANT: Do NOT attempt a profiles.upsert here.
-            // The on_auth_user_created trigger handles profile creation automatically.
-            // A manual upsert here fails if email confirmation is required (session is null).
-
             if (data.user && !data.session) {
-              // Email confirmation required — user created but not yet signed in
-              // Do NOT auto-login. Show a prominent message.
               this.authError = '';
-              this.authTab = 0; // Switch to sign-in tab
-              this.showNotification('Account created! Please check your email to verify your account before logging in.');
+              this.authTab = 0;
+              this.authSuccessMsg = `Account created! We've sent a confirmation email to ${this.regEmail.trim()}. Please click the link in that email, then sign in here.`;
+              this.showNotification('Check your email to verify your account!');
             } else if (data.session) {
-              // Email confirmation disabled — user is immediately signed in
-              this.showNotification('Account created! Welcome to Vibe.');
+              this.showNotification(`Welcome to Vibe, ${this.regName.trim().split(' ')[0]}!`);
               this.authModalOpen = false;
             }
-
-            // Reset form
             this.regName = ''; this.regEmail = ''; this.regPhone = '';
             this.regPassword = ''; this.regConfirmPassword = '';
           } catch (e) {
-            // Surface clean errors to the user
             let msg = e.message || 'Registration failed';
-            if (msg.includes('already registered')) msg = 'This email is already registered. Try signing in.';
-            if (msg.includes('Password should be')) msg = 'Password must be at least 6 characters.';
+            if (msg.includes('already registered') || msg.includes('User already registered')) {
+              msg = 'This email is already registered. Please sign in instead.';
+              this.authTab = 0;
+            } else if (msg.includes('Password should be') || msg.includes('password')) {
+              msg = 'Password must be at least 6 characters.';
+            } else if (msg.includes('over_email_send_rate_limit') || msg.includes('rate') || msg.includes('too_many')) {
+              msg = 'Too many registration attempts. Please wait a minute before trying again.';
+            } else if (msg.includes('invalid email') || msg.includes('Unable to validate email')) {
+              msg = 'Please enter a valid email address.';
+            }
             this.authError = msg;
           } finally {
             this.authLoading = false;
@@ -3225,16 +3531,10 @@
         async signOut() {
           try {
             await supabaseClient.auth.signOut();
-            this.isLoggedIn = false;
-            this.userData = null;
-            this.orders = [];
-            this.savedAddresses = [];
-            localStorage.removeItem('vibe_user');
-            this.showNotification('Signed out');
-            // Re-fetch cart for guest session
-            await this.fetchActiveCart();
+            this.showNotification('Signed out successfully');
           } catch (e) {
             console.error('Sign out failed:', e);
+            this.showNotification('Failed to sign out');
           }
         },
 
@@ -3294,26 +3594,74 @@
           }
         },
 
-        async trackGuestOrder() {
-          if (!this.trackOrderId) {
-            this.showNotification('Please enter an order ID');
-            return;
-          }
+        async setDefaultAddress(addressId) {
+          if (!this.userData?.id) return;
           try {
-            const { data, error } = await supabaseClient
-              .from('orders')
-              .select('*, order_items(*)')
-              .eq('order_number', this.trackOrderId.replace('#', ''))
-              .limit(1);
+            const { error } = await supabaseClient.rpc('set_default_address', {
+              p_user_id: this.userData.id,
+              p_address_id: addressId
+            });
             if (error) throw error;
-            if (data && data.length > 0) {
-              this.showNotification('Order found! Status: ' + data[0].status);
+            this.savedAddresses = this.savedAddresses.map(a => ({
+              ...a, is_default: a.id === addressId
+            }));
+            this.showNotification('Default address updated!');
+          } catch (e) {
+            console.error('Set default address failed:', e);
+            this.showNotification('Failed to update default address.');
+          }
+        },
+
+        async deleteAddress(addressId, idx) {
+          try {
+            const { error } = await supabaseClient
+              .from('saved_addresses')
+              .delete()
+              .eq('id', addressId)
+              .eq('user_id', this.userData.id);
+            if (error) throw error;
+            this.savedAddresses.splice(idx, 1);
+            this.showNotification('Address removed.');
+          } catch (e) {
+            console.error('Delete address failed:', e);
+            this.showNotification('Failed to remove address.');
+          }
+        },
+
+        toggleOrderDetail(orderId) {
+          this.expandedOrderId = this.expandedOrderId === orderId ? null : orderId;
+        },
+
+        viewJustPlacedOrder() {
+          this.authModalOpen = true;
+          this.dashTab = 'orders';
+          this.$nextTick(() => { this.expandedOrderId = this.generatedOrderId.replace('#', ''); });
+        },
+
+        async trackGuestOrder() {
+          this.trackedOrder = null;
+          this.trackOrderError = '';
+          const orderId = this.trackOrderId.trim().replace('#', '').toUpperCase();
+          const phone = this.trackPhone.trim();
+          if (!orderId) { this.trackOrderError = 'Please enter your Order ID.'; return; }
+          if (!phone) { this.trackOrderError = 'Please enter your phone number for verification.'; return; }
+          this.authLoading = true;
+          try {
+            const { data, error } = await supabaseClient.rpc('track_guest_order', {
+              p_order_number: orderId,
+              p_phone: phone
+            });
+            if (error) throw error;
+            if (!data) {
+              this.trackOrderError = 'Order not found. Please verify your Order ID and phone number.';
             } else {
-              this.showNotification('Order not found. Check your order ID.');
+              this.trackedOrder = data;
             }
           } catch (e) {
             console.error('Track order failed:', e);
-            this.showNotification('Failed to track order');
+            this.trackOrderError = 'Unable to fetch order. Please try again.';
+          } finally {
+            this.authLoading = false;
           }
         },
 
