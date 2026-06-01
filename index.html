@@ -370,7 +370,7 @@
        x-transition:leave="transition ease-in duration-200"
        x-transition:leave-start="translate-y-0 opacity-100"
        x-transition:leave-end="translate-y-8 opacity-0"
-       class="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[900] bg-base-success text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+       class="fixed bottom-28 md:bottom-8 left-1/2 -translate-x-1/2 z-[900] bg-base-success text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
     <span x-text="toastMessage"></span>
   </div>
@@ -398,7 +398,7 @@
     </div>
     <!-- Items -->
     <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-3">
-      <template x-for="item in selectedCartItems" :key="'mos-'+item.variant_id">
+      <template x-for="item in selectedCartItems" :key="'mos-'+item.cart_item_id">
         <div class="flex gap-3">
           <img :src="getCartItemDetails(item).image" class="w-10 h-10 rounded-lg object-cover flex-shrink-0">
           <div class="flex-1 min-w-0">
@@ -431,7 +431,7 @@
   <aside class="sidebar-drawer" :class="{'open': sidebarOpen}" role="dialog" aria-label="Navigation menu">
     <!-- Header -->
     <div class="flex items-center justify-between px-5 py-4 border-b border-base-border flex-shrink-0">
-      <svg width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" @click="goHome(); closeSidebar();" class="cursor-pointer">
         <rect width="36" height="36" rx="9" fill="#0F0F0F"/>
         <path d="M10 10L18 27L26 10" stroke="#F8F6F3" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
@@ -444,15 +444,15 @@
     <div class="flex-1 overflow-y-auto custom-scroll">
       <!-- Quick links -->
       <nav class="px-5 pt-5 pb-3">
-        <a href="#" class="flex items-center gap-3 py-2.5 font-semibold text-base-fg hover:text-base-accent transition-smooth">
+        <a href="#" @click.prevent="goHome(); closeSidebar();" class="flex items-center gap-3 py-2.5 font-semibold text-base-fg hover:text-base-accent transition-smooth">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
           Home
         </a>
-        <a href="#" class="flex items-center gap-3 py-2.5 text-base-muted font-medium hover:text-base-fg transition-smooth">
+        <a href="#" @click.prevent="goHome(); closeSidebar();" class="flex items-center gap-3 py-2.5 text-base-muted font-medium hover:text-base-fg transition-smooth">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 3l14 9-14 9V3z"/></svg>
           New Arrivals
         </a>
-        <a href="#" class="flex items-center gap-3 py-2.5 text-base-muted font-medium hover:text-base-fg transition-smooth">
+        <a href="#" @click.prevent="goHome(); closeSidebar();" class="flex items-center gap-3 py-2.5 text-base-muted font-medium hover:text-base-fg transition-smooth">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
           Sale
         </a>
@@ -480,7 +480,7 @@
                x-transition:enter-end="opacity-100 translate-y-0"
                class="bg-base-surface/60 px-5 pb-3">
             <template x-for="sub in allSubcategories.filter(s => s.category_id === cat.id)" :key="sub.id">
-              <a href="#" @click.prevent="setCategory(cat.id); closeSidebar();"
+              <a href="#" @click.prevent="setCategory(cat.id); goHome(); closeSidebar();"
                  class="flex items-center gap-2.5 py-2 text-sm text-base-muted hover:text-base-accent transition-smooth">
                 <svg class="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
                 <span x-text="sub.name"></span>
@@ -549,12 +549,13 @@
 
       <!-- Cart item list -->
       <div class="space-y-3">
-        <template x-for="item in cart" :key="item.variant_id">
+        <template x-for="item in cart" :key="item.cart_item_id">
           <div class="flex gap-3 p-3 rounded-xl border transition-smooth"
                :class="item.selected ? 'border-base-accent bg-base-accent/5' : 'border-base-border bg-base-surface/50'">
             <!-- Checkbox -->
             <div class="flex items-center flex-shrink-0">
-              <input type="checkbox" class="premium-checkbox" x-model="item.selected">
+              <input type="checkbox" class="premium-checkbox" x-model="item.selected"
+                     @change="updateCartItemSelection(item)">
             </div>
             <!-- Image -->
             <div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-base-surface">
@@ -677,9 +678,9 @@
       </div>
       <!-- Search results -->
       <div x-show="searchQuery && searchQuery.trim().length > 0" class="mt-4">
-        <p class="text-sm text-base-muted mb-3" x-text="enrichedProducts.length + ' product' + (enrichedProducts.length !== 1 ? 's' : '') + ' found'"></p>
+        <p class="text-sm text-base-muted mb-3" x-text="searchResultsCount + ' product' + (searchResultsCount !== 1 ? 's' : '') + ' found'"></p>
         <div class="space-y-2 max-h-[60vh] overflow-y-auto custom-scroll">
-          <template x-for="product in paginatedProducts" :key="'search-'+product.id">
+          <template x-for="product in searchResults" :key="'search-'+product.id">
             <button @click="goToProduct(product.id); closeSearch();" class="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-base-border hover:border-base-fg transition-smooth text-left">
               <img :src="product.main_image" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
               <div class="flex-1 min-w-0">
@@ -705,7 +706,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <!-- Logo mark (SVG, no text) -->
-        <a href="#" class="flex-shrink-0">
+        <a href="#" @click.prevent="goHome()" class="flex-shrink-0">
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="36" height="36" rx="9" fill="#0F0F0F"/>
             <path d="M10 10L18 27L26 10" stroke="#F8F6F3" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -714,10 +715,10 @@
 
         <!-- Desktop center nav (hidden on mobile) -->
         <nav class="hidden lg:flex items-center gap-8">
-          <a href="#" class="text-sm font-medium text-base-fg hover:text-base-accent transition-smooth">Home</a>
-          <a href="#collection" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">Collection</a>
-          <a href="#" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">New Arrivals</a>
-          <a href="#" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">Sale</a>
+          <a href="#" @click.prevent="goHome()" class="text-sm font-medium text-base-fg hover:text-base-accent transition-smooth">Home</a>
+          <a href="#collection" @click.prevent="goHome(); $nextTick(() => document.getElementById('collection')?.scrollIntoView({behavior:'smooth'}))" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">Collection</a>
+          <a href="#" @click.prevent="goHome()" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">New Arrivals</a>
+          <a href="#" @click.prevent="goHome()" class="text-sm font-medium text-base-muted hover:text-base-fg transition-smooth">Sale</a>
         </nav>
 
         <!-- Right actions -->
@@ -923,7 +924,7 @@
           <p class="text-sm font-semibold tracking-widest uppercase text-base-accent mb-2">The Edit</p>
           <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl font-semibold text-base-fg leading-tight">Our Collection</h2>
         </div>
-        <a href="#" class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth flex items-center gap-1 self-start sm:self-auto">
+        <a href="#" @click.prevent="setCategory(null); goHome();" class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth flex items-center gap-1 self-start sm:self-auto">
           View all products
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5l7 7-7 7"/></svg>
         </a>
@@ -1371,7 +1372,7 @@
                 <button @click="mobileOrderSummaryOpen = true" class="text-xs text-base-muted hover:text-base-accent underline">View All</button>
               </div>
               <div class="flex gap-2 overflow-x-auto pb-1">
-                <template x-for="item in selectedCartItems.slice(0, 4)" :key="'mob-'+item.variant_id">
+                <template x-for="item in selectedCartItems.slice(0, 4)" :key="'mob-'+item.cart_item_id">
                   <div class="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-base-border">
                     <img :src="getCartItemDetails(item).image" class="w-full h-full object-cover" :alt="getCartItemDetails(item).name">
                   </div>
@@ -1394,7 +1395,9 @@
               </label>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <template x-for="(addr, idx) in savedAddresses" :key="idx">
-                  <div class="address-card bg-base-card rounded-xl p-3" @click="useSavedAddress(idx)">
+                  <div class="address-card bg-base-card rounded-xl p-3"
+                       :class="{'selected': shipping.name === addr.name && shipping.phone === addr.phone}"
+                       @click="useSavedAddress(idx)">
                     <p class="text-xs font-bold text-base-success mb-1" x-text="addr.label"></p>
                     <p class="text-sm font-medium text-base-fg" x-text="addr.name"></p>
                     <p class="text-xs text-base-muted line-clamp-2" x-text="addr.details"></p>
@@ -1422,17 +1425,21 @@
                 <input id="shipping-phone" x-model="shipping.phone" @input="saveToStorage(); validationErrors.phone = ''" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border text-sm font-medium checkout-input transition-smooth" :class="validationErrors.phone ? 'border-red-500 bg-red-50/30' : 'border-base-border'">
                 <p x-show="validationErrors.phone" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.phone"></p>
               </div>
-              <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Alternative Number <span class="text-base-muted font-normal">(optional)</span></label><input x-model="shipping.altPhone" @input="saveToStorage()" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
-              <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Email Address <span class="text-base-muted font-normal">(optional)</span></label><input x-model="shipping.email" @input="saveToStorage()" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+              <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Alternative Number <span class="text-base-muted font-normal">(optional)</span></label><input id="shipping-altPhone" x-model="shipping.altPhone" @input="saveToStorage(); validationErrors.altPhone = ''" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="validationErrors.altPhone" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.altPhone"></p></div>
+              <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Email Address <span class="text-base-muted font-normal">(optional)</span></label><input id="shipping-email" x-model="shipping.email" @input="saveToStorage(); validationErrors.email = ''" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="validationErrors.email" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.email"></p></div>
               <div>
                 <label class="block text-sm font-semibold text-base-fg mb-1.5">District <span class="text-base-muted font-normal text-xs">(can be changed)</span></label>
-                <select id="shipping-district" x-model="selectedDistrict" @change="saveToStorage()" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium text-base-fg bg-white checkout-input">
+                <select id="shipping-district" x-model="selectedDistrict"
+                        @change="shipping.upazilla = ''; validationErrors.upazilla = ''; validationErrors.district = ''; saveToStorage();"
+                        class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium text-base-fg bg-white checkout-input">
                   <option value="">Select District</option>
                   <option value="Dhaka">Dhaka (Inside)</option>
                   <option value="Chittagong">Chittagong</option>
                   <option value="Sylhet">Sylhet</option>
                   <option value="Rajshahi">Rajshahi</option>
                 </select>
+                <p x-show="validationErrors.district" x-transition
+                   class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.district"></p>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-base-fg mb-1.5">Upazilla / Area *</label>
@@ -1466,18 +1473,7 @@
               </div>
             </div>
 
-            <!-- Cloudflare Turnstile Placeholder (Mobile) -->
-            <div class="md:hidden mt-4 mb-2 p-4 rounded-xl border border-base-border bg-base-surface/40">
-              <div class="flex items-center gap-2 mb-2.5">
-                <svg class="w-4 h-4 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                <span class="text-xs font-semibold text-base-muted">Security Verification</span>
-              </div>
-              <div class="cf-turnstile-placeholder w-full h-[65px] rounded-lg border border-dashed border-base-border bg-white flex items-center justify-center">
-                <div class="flex items-center gap-2 text-base-muted">
-                  <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           <!-- Desktop Order Summary Sidebar -->
@@ -1485,7 +1481,7 @@
             <div class="bg-base-card rounded-2xl border border-base-border p-5 sticky top-24">
               <h3 class="text-sm font-bold text-base-fg mb-3">Order Summary</h3>
               <div class="space-y-2 mb-4 max-h-48 overflow-y-auto custom-scroll">
-                <template x-for="item in selectedCartItems" :key="'sum-'+item.variant_id">
+                <template x-for="item in selectedCartItems" :key="'sum-'+item.cart_item_id">
                   <div class="flex items-center gap-3">
                     <img :src="getCartItemDetails(item).image" class="w-10 h-10 rounded-lg object-cover">
                     <div class="flex-1 min-w-0"><p class="text-xs font-medium text-base-fg truncate" x-text="getCartItemDetails(item).name"></p><p class="text-[11px] text-base-muted" x-text="'x' + item.qty"></p></div>
@@ -1498,18 +1494,6 @@
                 <div class="flex justify-between"><span class="text-base-muted">Delivery</span><span class="font-semibold" :class="cartDeliveryFee === 0 ? 'text-base-success' : ''" x-text="!selectedDistrict ? '—' : (cartDeliveryFee === 0 ? 'Free' : formatPrice(cartDeliveryFee))"></span></div>
                 <template x-if="cartDiscount > 0"><div class="flex justify-between"><span class="text-base-success">Discount</span><span class="font-semibold text-base-success" x-text="'-' + formatPrice(cartDiscount)"></span></div></template>
                 <div class="border-t border-base-border pt-2"><div class="flex justify-between"><span class="font-bold text-base-fg">Total</span><span class="font-display font-bold text-lg" x-text="selectedDistrict ? formatPrice(cartTotal) : '—'"></span></div></div>
-              </div>
-              <!-- Cloudflare Turnstile Placeholder -->
-              <div class="mt-4 mb-3 p-4 rounded-xl border border-base-border bg-base-surface/40">
-                <div class="flex items-center gap-2 mb-2.5">
-                  <svg class="w-4 h-4 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span class="text-xs font-semibold text-base-muted">Security Verification</span>
-                </div>
-                <div class="cf-turnstile-placeholder w-full h-[65px] rounded-lg border border-dashed border-base-border bg-white flex items-center justify-center">
-                  <div class="flex items-center gap-2 text-base-muted">
-                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                  </div>
-                </div>
               </div>
 
               <button @click="goToCheckoutStep(2)" class="w-full mt-4 py-3 px-6 bg-base-fg text-white font-medium rounded-xl hover:bg-base-fg/90 transition-smooth btn-press">Continue to Payment</button>
@@ -1556,7 +1540,7 @@
                 <button @click="mobileOrderSummaryOpen = true" class="text-xs text-base-muted hover:text-base-accent underline">View All</button>
               </div>
               <div class="flex gap-2 overflow-x-auto pb-1">
-                <template x-for="item in selectedCartItems.slice(0, 4)" :key="'mob2-'+item.variant_id">
+                <template x-for="item in selectedCartItems.slice(0, 4)" :key="'mob2-'+item.cart_item_id">
                   <div class="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-base-border">
                     <img :src="getCartItemDetails(item).image" class="w-full h-full object-cover" :alt="getCartItemDetails(item).name">
                   </div>
@@ -1595,7 +1579,7 @@
               </div>
               <div class="payment-panel mt-3" :class="{'open': selectedPayment === 'bkash'}">
                 <div class="bg-pink-50/50 rounded-xl p-4 space-y-3">
-                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">bKash Number</label><input x-model="bkashNumber" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">bKash Number</label><input x-model="bkashNumber" @blur="bkashNumber = bkashNumber.replace(/\D/g,'').slice(0,11)" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <div><label class="text-xs font-semibold text-base-muted mb-1 block">Transaction ID</label><input x-model="bkashTrxId" type="text" placeholder="Enter TrxID" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <p class="text-[11px] text-base-muted leading-relaxed">Send payment to <span class="font-semibold text-base-fg">01XXXXXXXXX</span> and enter the Transaction ID above.</p>
                 </div>
@@ -1612,7 +1596,7 @@
               </div>
               <div class="payment-panel mt-3" :class="{'open': selectedPayment === 'nagad'}">
                 <div class="bg-orange-50/50 rounded-xl p-4 space-y-3">
-                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">Nagad Number</label><input x-model="nagadNumber" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">Nagad Number</label><input x-model="nagadNumber" @blur="nagadNumber = nagadNumber.replace(/\D/g,'').slice(0,11)" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <div><label class="text-xs font-semibold text-base-muted mb-1 block">Transaction ID</label><input x-model="nagadTrxId" type="text" placeholder="Enter TrxID" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <p class="text-[11px] text-base-muted leading-relaxed">Send payment to <span class="font-semibold text-base-fg">01XXXXXXXXX</span> and enter the Transaction ID above.</p>
                 </div>
@@ -1629,7 +1613,7 @@
               </div>
               <div class="payment-panel mt-3" :class="{'open': selectedPayment === 'rocket'}">
                 <div class="bg-purple-50/50 rounded-xl p-4 space-y-3">
-                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">Rocket Number</label><input x-model="rocketNumber" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div><label class="text-xs font-semibold text-base-muted mb-1 block">Rocket Number</label><input x-model="rocketNumber" @blur="rocketNumber = rocketNumber.replace(/\D/g,'').slice(0,11)" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <div><label class="text-xs font-semibold text-base-muted mb-1 block">Transaction ID</label><input x-model="rocketTrxId" type="text" placeholder="Enter TrxID" class="w-full px-4 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
                   <p class="text-[11px] text-base-muted leading-relaxed">Send payment to <span class="font-semibold text-base-fg">01XXXXXXXXX</span> and enter the Transaction ID above.</p>
                 </div>
@@ -1650,7 +1634,7 @@
             <div class="bg-base-card rounded-2xl border border-base-border p-5 sticky top-24">
               <h3 class="text-sm font-bold text-base-fg mb-3">Order Summary</h3>
               <div class="space-y-2 mb-4 max-h-48 overflow-y-auto custom-scroll">
-                <template x-for="item in selectedCartItems" :key="'p4-'+item.variant_id">
+                <template x-for="item in selectedCartItems" :key="'p4-'+item.cart_item_id">
                   <div class="flex items-center gap-3"><img :src="getCartItemDetails(item).image" class="w-10 h-10 rounded-lg object-cover"><div class="flex-1 min-w-0"><p class="text-xs font-medium text-base-fg truncate" x-text="getCartItemDetails(item).name"></p><p class="text-[11px] text-base-muted" x-text="'x' + item.qty"></p></div><p class="text-xs font-bold text-base-fg" x-text="formatPrice(getCartItemDetails(item).price * item.qty)"></p></div>
                 </template>
               </div>
@@ -1660,6 +1644,9 @@
                 <template x-if="cartDiscount > 0"><div class="flex justify-between"><span class="text-base-success">Discount</span><span class="font-semibold text-base-success" x-text="'-' + formatPrice(cartDiscount)"></span></div></template>
                 <div class="border-t border-base-border pt-2"><div class="flex justify-between"><span class="font-bold text-base-fg">Total</span><span class="font-display font-bold text-lg" x-text="formatPrice(cartTotal)"></span></div></div>
               </div>
+              <p x-show="paymentValidationHint && !canPlaceOrder"
+                 class="text-xs text-red-500 font-medium mb-2 text-center"
+                 x-text="paymentValidationHint"></p>
               <button @click="placeOrder()" :disabled="!canPlaceOrder" class="w-full mt-4 py-3 px-6 bg-base-success text-white font-medium rounded-xl hover:opacity-90 transition-smooth btn-press disabled:opacity-50 disabled:cursor-not-allowed">
                 Place Order — <span x-text="formatPrice(cartTotal)"></span>
               </button>
@@ -1776,6 +1763,8 @@
           </div>
           <!-- Step 2 buttons: Payment -->
           <div x-show="checkoutStep === 2" class="flex items-center gap-2">
+            <p x-show="paymentValidationHint && !canPlaceOrder"
+               class="text-xs text-red-500 font-medium hidden" x-text="paymentValidationHint"></p>
             <button @click="goToCheckoutStep(1)" class="px-4 py-2.5 rounded-xl border border-base-border text-base-muted font-semibold text-sm hover:bg-base-surface transition-smooth flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
               Shipping
@@ -1817,6 +1806,18 @@
 
       <!-- Content: payment-specific confirmation -->
       <div class="p-5 space-y-4">
+        <!-- Shipping address summary -->
+        <div class="flex items-center gap-2 p-3 bg-base-surface rounded-xl">
+          <svg class="w-4 h-4 text-base-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-base-fg" x-text="shipping.name"></p>
+            <p class="text-xs text-base-muted truncate" x-text="shipping.phone + ' · ' + shipping.address + (shipping.upazilla ? ', ' + shipping.upazilla : '') + (selectedDistrict ? ', ' + selectedDistrict : '')"></p>
+          </div>
+          <button @click="closeReconfirmModal(); goToCheckoutStep(1);" class="ml-auto text-xs font-semibold text-base-accent hover:underline flex-shrink-0">Edit</button>
+        </div>
         <!-- COD -->
         <template x-if="selectedPayment === 'cod'">
           <div class="space-y-4">
@@ -1891,14 +1892,7 @@
       </div>
 
       <!-- Cloudflare Turnstile -->
-      <div class="px-5 mt-3">
-        <div
-          class="cf-turnstile"
-          data-sitekey="YOUR_TURNSTILE_SITE_KEY_HERE"
-          data-callback="onTurnstileSuccess"
-          data-theme="light">
-        </div>
-      </div>
+      <div id="turnstile-container" class="px-5 mt-3 min-h-[70px]"></div>
       <!-- Friction Checkbox -->
       <div class="px-5">
         <label class="flex items-start gap-3 bg-base-surface p-3.5 rounded-xl border border-base-border cursor-pointer select-none my-3">
@@ -2044,7 +2038,7 @@
                     </template>
                   </div>
                   <div class="space-y-1 border-t border-base-border pt-2">
-                    <template x-for="item in (trackedOrder.items || [])" :key="item.id">
+                    <template x-for="(item, idx) in (trackedOrder.items || [])" :key="'ti-'+idx">
                       <div class="flex justify-between text-xs">
                         <span class="text-base-muted" x-text="item.product_title + (item.variant_label ? ' — ' + item.variant_label : '') + ' × ' + item.qty"></span>
                         <span class="font-semibold text-base-fg" x-text="formatPrice(item.price_at_purchase * item.qty)"></span>
@@ -2138,7 +2132,13 @@
                          class="border-t border-base-border p-4 space-y-4">
                       <div>
                         <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Delivery Status</p>
-                        <div class="flex items-center gap-0">
+                        <div x-show="order.status === 'cancelled'" class="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl">
+                          <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                          <span class="text-xs font-semibold text-red-600">This order has been cancelled.</span>
+                        </div>
+                        <div x-show="order.status !== 'cancelled'" class="flex items-center gap-0">
                           <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="step">
                             <div class="flex items-center flex-1 last:flex-none">
                               <div class="flex flex-col items-center">
@@ -2244,6 +2244,13 @@
                 <input x-model="newAddr.name" type="text" placeholder="Full Name" class="w-full px-3 py-2.5 rounded-lg border border-base-border text-sm font-medium checkout-input">
                 <input x-model="newAddr.phone" type="tel" placeholder="Phone Number" class="w-full px-3 py-2.5 rounded-lg border border-base-border text-sm font-medium checkout-input">
                 <input x-model="newAddr.district" type="text" placeholder="District" class="w-full px-3 py-2.5 rounded-lg border border-base-border text-sm font-medium checkout-input">
+                <select x-model="newAddr.upazilla"
+                        class="w-full px-3 py-2.5 rounded-lg border border-base-border text-sm font-medium text-base-fg bg-white checkout-input">
+                  <option value="">Select Upazilla (optional)</option>
+                  <template x-for="u in (DISTRICT_DATA[newAddr.district] || [])" :key="u">
+                    <option :value="u" x-text="u"></option>
+                  </template>
+                </select>
                 <textarea x-model="newAddr.details" rows="2" placeholder="Full Address" class="w-full px-3 py-2.5 rounded-lg border border-base-border text-sm font-medium resize-none checkout-input"></textarea>
                 <div class="flex gap-2"><button @click="showAddAddr = false" class="flex-1 py-2 rounded-lg border border-base-border text-base-muted text-xs font-semibold">Cancel</button><button @click="addAddress()" class="flex-1 py-2 rounded-lg bg-base-fg text-white text-xs font-semibold">Save</button></div>
               </div>
@@ -2377,7 +2384,7 @@
         <span class="text-[10px] font-medium">Home</span>
       </a>
       <!-- Categories -->
-      <a href="#collection" @click.prevent="bottomNavActive = 'categories'; document.getElementById('collection')?.scrollIntoView({behavior:'smooth'})" class="flex flex-col items-center gap-1 py-1 transition-smooth" :class="bottomNavActive === 'categories' ? 'text-base-accent' : 'text-base-muted hover:text-base-fg'">
+      <a href="#collection" @click.prevent="bottomNavActive = 'categories'; if(currentView !== 'home') { goHome(); $nextTick(() => document.getElementById('collection')?.scrollIntoView({behavior:'smooth'})); } else { document.getElementById('collection')?.scrollIntoView({behavior:'smooth'}); }" class="flex flex-col items-center gap-1 py-1 transition-smooth" :class="bottomNavActive === 'categories' ? 'text-base-accent' : 'text-base-muted hover:text-base-fg'">
         <svg class="w-5 h-5" :fill="bottomNavActive === 'categories' ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
         <span class="text-[10px] font-medium">Categories</span>
       </a>
@@ -2405,20 +2412,6 @@
     const SUPABASE_URL = 'https://qfjiovpsypbzkvalcuox.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmamlvdnBzeXBiemt2YWxjdW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjM5ODAsImV4cCI6MjA5NTYzOTk4MH0.QJV1ckOy_VsHTi6DAFebJuzo6EliUr5EmATqLOEo14Q';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // Cloudflare Turnstile callback — must be global
-    function onTurnstileSuccess(token) {
-      // Find the Alpine component and set the token
-      const el = document.querySelector('[x-data="storefront()"]');
-      if (el) {
-        // Use Alpine's internal API to reliably set data on the component
-        const alpine = Alpine.$data(el);
-        if (alpine) {
-          alpine.turnstileToken = token;
-          alpine.turnstileVerified = true;
-        }
-      }
-    }
 
     function storefront() {
       return {
@@ -2479,6 +2472,7 @@
         promoApplied: null,
         promoStatusMsg: '',
         promoStatusSuccess: false,
+        _promoMinOrder: 0,
 
         /* Checkout step: 1=Shipping, 2=Payment, 3=Success */
         checkoutStep: 1,
@@ -2522,7 +2516,7 @@
         ordersLoading: false,
         savedAddresses: [],
         showAddAddr: false,
-        newAddr: { label: '', name: '', phone: '', district: '', details: '' },
+        newAddr: { label: '', name: '', phone: '', district: '', upazilla: '', details: '' },
         _authInitialized: false,
 
         /* ---------- Config ---------- */
@@ -2566,6 +2560,22 @@
         },
         get paginatedProducts() { return this.enrichedProducts.slice(0, this.productsShown); },
         get hasMoreProducts() { return this.productsShown < this.enrichedProducts.length; },
+        get searchResults() {
+          return this.filteredProducts.map(p => {
+            const cat = this.allCategories.find(c => c.id === p.category_id);
+            const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
+            const variants = this.allVariants.filter(v => v.product_id === p.id && v.is_active);
+            let displayPrice = p.base_price;
+            if (p.has_variations && variants.length) {
+              const effPrices = variants.map(v => v.discount_price && v.discount_price < v.price ? v.discount_price : v.price);
+              displayPrice = Math.min(...effPrices);
+            }
+            return { ...p, category_name: cat?.name || '', displayPrice };
+          }).slice(0, this.productsShown);
+        },
+        get searchResultsCount() {
+          return this.filteredProducts.length;
+        },
         loadMoreProducts() { this.productsShown += 20; },
 
         get cartItemCount() { return this.cart.reduce((s, i) => s + i.qty, 0); },
@@ -2618,6 +2628,15 @@
           return true;
         },
         get canFinalConfirm() { return this.finalConfirmCheck && this.turnstileVerified; },
+        get paymentValidationHint() {
+          if (!this.selectedPayment) return 'Please select a payment method above.';
+          if (this.selectedPayment === 'cod' && (!this.codPolicy1 || !this.codPolicy2)) return 'Please accept both COD policies above.';
+          if (this.selectedPayment === 'bkash' && (!this.bkashNumber.trim() || !this.bkashTrxId.trim())) return 'Please enter your bKash number and transaction ID.';
+          if (this.selectedPayment === 'nagad' && (!this.nagadNumber.trim() || !this.nagadTrxId.trim())) return 'Please enter your Nagad number and transaction ID.';
+          if (this.selectedPayment === 'rocket' && (!this.rocketNumber.trim() || !this.rocketTrxId.trim())) return 'Please enter your Rocket number and transaction ID.';
+          if (!this.confirmOrderCheck) return 'Please confirm your order by checking the box below.';
+          return '';
+        },
 
         /* ========== HELPERS ========== */
         formatPrice(amount) { return '৳' + Number(amount).toLocaleString('en-IN'); },
@@ -2666,7 +2685,9 @@
             const [catRes, subRes, prodRes, varRes] = await Promise.all([
               supabaseClient.from('categories').select('*').order('sort_order'),
               supabaseClient.from('subcategories').select('*').order('sort_order'),
-              supabaseClient.from('products').select('*').eq('is_active', true).order('id'),
+              supabaseClient.from('products')
+                .select('id, title, category_id, subcategory_id, base_price, has_variations, main_image, is_active')
+                .eq('is_active', true).order('id'),
               supabaseClient.from('product_variants').select('*').order('id'),
             ]);
             this.allCategories = catRes.data || [];
@@ -2680,6 +2701,16 @@
           } catch (e) {
             console.error('Failed to fetch catalog:', e);
           }
+        },
+
+        async fetchFullProduct(productId) {
+          const { data, error } = await supabaseClient
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+          if (error) return null;
+          return data;
         },
 
         async fetchActiveCart() {
@@ -2775,30 +2806,35 @@
         async performSearch() {
           if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
           this._searchDebounceTimer = setTimeout(async () => {
+            const q = this.searchQuery.trim();
+
+            if (!q) {
+              this.filteredProducts = [...this.allProducts];
+              this.productsShown = 20;
+              return;
+            }
+
             this.searchLoading = true;
             try {
-              const q = this.searchQuery.trim();
-              let query = supabaseClient
+              const { data, error } = await supabaseClient
                 .from('products')
-                .select('*')
+                .select('id, title, main_image, category_id, subcategory_id, base_price, has_variations, is_active')
                 .eq('is_active', true)
-                .order('id');
-
-              if (q) {
-                query = query.ilike('title', `%${q}%`);
-              }
-
-              const { data, error } = await query;
+                .ilike('title', `%${q}%`)
+                .order('title')
+                .limit(50);
               if (error) throw error;
               this.filteredProducts = data || [];
               this.productsShown = 20;
             } catch (e) {
               console.error('Search failed:', e);
-              this.filteredProducts = this.allProducts; // graceful fallback
+              this.filteredProducts = this.allProducts.filter(p =>
+                p.title.toLowerCase().includes(q.toLowerCase())
+              );
             } finally {
               this.searchLoading = false;
             }
-          }, 300); // 300ms debounce
+          }, 300);
         },
 
         async fetchUserProfile(userId) {
@@ -2869,6 +2905,14 @@
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
           this.$watch('authTab', () => { this.authError = ''; this.authSuccessMsg = ''; });
+          this.$watch('cartSubtotal', (newVal) => {
+            if (this.promoApplied && this._promoMinOrder && newVal < this._promoMinOrder) {
+              this.promoApplied = null;
+              this.promoCode = '';
+              this._promoMinOrder = 0;
+              this.showNotification('Promo removed — cart total no longer meets minimum order requirements.');
+            }
+          });
         },
 
         async _handleAuthUser(user) {
@@ -2937,12 +2981,13 @@
 
         /* ========== SEARCH ========== */
         openSearch() { this.searchOpen = true; this.productsShown = 20; this.$nextTick(() => { const el = document.getElementById('main-search'); if (el) el.focus(); }); },
-        closeSearch() { this.searchOpen = false; this.searchQuery = ''; this.productsShown = 20; },
+        closeSearch() { this.searchOpen = false; this.searchQuery = ''; this.filteredProducts = [...this.allProducts]; this.productsShown = 20; },
 
         /* ========== CATEGORY ========== */
         setCategory(catId) {
           this.activeCategory = this.activeCategory === catId ? null : catId;
           this.productsShown = 20;
+          this.filteredProducts = [...this.allProducts];
         },
 
         /* ========== VARIANT MODAL ========== */
@@ -3038,46 +3083,58 @@
 
         async confirmAddToCart() {
           const items = Object.entries(this.cartItems).filter(([id, data]) => data.qty > 0);
+          if (!items.length) return;
           const cartReady = await this.ensureActiveCart();
           if (!cartReady) {
             this.showNotification('Could not initialize cart. Please refresh and try again.');
             return;
           }
           try {
+            const toInsert = [];
+            const toUpdate = [];
             for (const [variantId, data] of items) {
               const variant = this.modalVariants.find(v => v.id == variantId);
+              if (!variant) continue;
               const vId = variantId != null ? Number(variantId) : null;
               const existing = this.cart.find(c => {
                 const cVid = c.variant_id ?? null;
-                return vId !== null ? cVid === vId : (cVid === null && c.product_id === variant?.product_id);
+                return vId !== null ? cVid === vId : (cVid === null && c.product_id === variant.product_id);
               });
               if (existing) {
-                const newQty = existing.qty + data.qty;
-                await supabaseClient
-                  .from('cart_items')
-                  .update({ qty: newQty, selected: true })
-                  .eq('id', existing.cart_item_id);
-                existing.qty = newQty;
-                existing.selected = true;
+                toUpdate.push({ item: existing, qty: existing.qty + data.qty });
               } else {
-                const { data: inserted, error } = await supabaseClient
-                  .from('cart_items')
-                  .insert({
-                    cart_id: this.activeCartId,
-                    product_id: variant.product_id,
-                    product_variant_id: vId,
-                    qty: data.qty,
-                    selected: true
-                  })
-                  .select()
-                  .single();
-                if (error) throw error;
-                this.cart.push({
+                toInsert.push({
+                  cart_id: this.activeCartId,
                   product_id: variant.product_id,
-                  variant_id: vId,
+                  product_variant_id: vId,
                   qty: data.qty,
                   selected: true,
-                  cart_item_id: inserted.id
+                  _variantId: vId,
+                  _productId: variant.product_id
+                });
+              }
+            }
+            for (const { item, qty } of toUpdate) {
+              const { error } = await supabaseClient
+                .from('cart_items').update({ qty, selected: true }).eq('id', item.cart_item_id);
+              if (error) throw error;
+              item.qty = qty;
+              item.selected = true;
+            }
+            if (toInsert.length) {
+              const insertPayload = toInsert.map(({ cart_id, product_id, product_variant_id, qty, selected }) =>
+                ({ cart_id, product_id, product_variant_id, qty, selected })
+              );
+              const { data: inserted, error } = await supabaseClient
+                .from('cart_items').insert(insertPayload).select();
+              if (error) throw error;
+              for (let i = 0; i < inserted.length; i++) {
+                this.cart.push({
+                  product_id: toInsert[i]._productId,
+                  variant_id: toInsert[i]._variantId,
+                  qty: toInsert[i].qty,
+                  selected: true,
+                  cart_item_id: inserted[i].id
                 });
               }
             }
@@ -3088,11 +3145,24 @@
             this.openCartDrawer(true);
           } catch (e) {
             console.error('Confirm add to cart failed:', e);
-            this.showNotification('Failed to add items');
+            this.showNotification('Failed to add items. Please try again.');
+            await this.fetchActiveCart();
           }
         },
 
         /* ========== CART MANAGEMENT ========== */
+        async updateCartItemSelection(item) {
+          if (!item.cart_item_id) return;
+          try {
+            await supabaseClient
+              .from('cart_items')
+              .update({ selected: item.selected })
+              .eq('id', item.cart_item_id);
+          } catch (e) {
+            console.error('Failed to update cart item selection:', e);
+          }
+        },
+
         async removeFromCart(variantId, productId) {
           const vId = variantId ?? null;
           const item = this.cart.find(c => {
@@ -3167,6 +3237,7 @@
             const discount = data.discount_percentage / 100;
             const label = data.discount_percentage + '% off';
             this.promoApplied = { code, discount, label };
+            this._promoMinOrder = data.min_order_amount || 0;
             this.promoStatusMsg = 'Promo applied: ' + label;
             this.promoStatusSuccess = true;
             this.showNotification('Promo applied — ' + label + '!');
@@ -3180,6 +3251,7 @@
         removePromo() {
           this.promoApplied = null;
           this.promoCode = '';
+          this._promoMinOrder = 0;
           this.promoStatusMsg = '';
           this.showNotification('Promo removed');
         },
@@ -3233,6 +3305,11 @@
               if (!firstErrorField) firstErrorField = 'shipping-phone';
             }
 
+            if (!this.selectedDistrict) {
+              this.validationErrors.district = 'Please select your delivery district';
+              if (!firstErrorField) firstErrorField = 'shipping-district';
+            }
+
             if (!this.shipping.upazilla) {
               this.validationErrors.upazilla = 'Please select your Upazilla / Area';
               if (!firstErrorField) firstErrorField = 'shipping-upazilla';
@@ -3244,6 +3321,21 @@
             } else if (this.shipping.address.trim().length < 5) {
               this.validationErrors.address = 'Address seems too short — please provide more detail';
               if (!firstErrorField) firstErrorField = 'shipping-address';
+            }
+
+            if (this.shipping.email && this.shipping.email.trim()) {
+              const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRx.test(this.shipping.email.trim())) {
+                this.validationErrors.email = 'Please enter a valid email address';
+                if (!firstErrorField) firstErrorField = 'shipping-email';
+              }
+            }
+            if (this.shipping.altPhone && this.shipping.altPhone.trim()) {
+              const altDigits = this.shipping.altPhone.replace(/\s/g, '');
+              if (!/^01[3-9]\d{8}$/.test(altDigits)) {
+                this.validationErrors.altPhone = 'Please enter a valid 11-digit phone number';
+                if (!firstErrorField) firstErrorField = 'shipping-altPhone';
+              }
             }
 
             if (Object.keys(this.validationErrors).length > 0) {
@@ -3280,7 +3372,35 @@
 
         showReconfirmModal() {
           this.finalConfirmCheck = false;
+          this.turnstileVerified = false;
+          this.turnstileToken = '';
           this.reconfirmModalOpen = true;
+          this.mountTurnstile();
+        },
+
+        mountTurnstile() {
+          this.$nextTick(() => {
+            const container = document.getElementById('turnstile-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (window.turnstile) {
+              window.turnstile.render(container, {
+                sitekey: '1x00000000000000000000AA', // Cloudflare test key — replace with real key in production
+                callback: (token) => {
+                  this.turnstileToken = token;
+                  this.turnstileVerified = true;
+                },
+                'expired-callback': () => {
+                  this.turnstileVerified = false;
+                  this.turnstileToken = '';
+                },
+                'error-callback': () => {
+                  this.turnstileVerified = false;
+                },
+                theme: 'light'
+              });
+            }
+          });
         },
 
         closeReconfirmModal() {
@@ -3288,10 +3408,22 @@
           this.finalConfirmCheck = false;
         },
 
+        generateOrderNumber() {
+          const ts = Date.now().toString(36).toUpperCase();
+          const rand = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+          return `VBE-${ts}${rand}`;
+        },
+
         async confirmAndPlaceOrder() {
           if (!this.finalConfirmCheck) return;
           if (!this.turnstileVerified) {
             this.showNotification('Please complete the security verification (Turnstile).');
+            return;
+          }
+          if (!this.selectedDistrict) {
+            this.reconfirmModalOpen = false;
+            this.goToCheckoutStep(1);
+            this.showNotification('Please select your delivery district first.');
             return;
           }
           this.reconfirmModalOpen = false;
@@ -3304,7 +3436,8 @@
           const orderDelivery = this.cartDeliveryFee;
           const orderDiscount = this.cartDiscount;
 
-          this.generatedOrderId = '#VBE-' + String(Math.floor(10000 + Math.random() * 90000));
+          const orderNum = this.generateOrderNumber();
+          this.generatedOrderId = '#' + orderNum;
 
           try {
             // Build payment_info JSONB
@@ -3362,16 +3495,27 @@
             this.cart = this.cart.filter(i => !i.selected);
 
             // Also save order locally for the orders list
-            this.orders.push({
-              id: this.generatedOrderId,
-              date: new Date().toLocaleDateString(),
+            this.orders.unshift({
+              id: this.generatedOrderId.replace('#', ''),
+              dbId: orderData.id,
+              date: new Date().toLocaleDateString('en-BD', { year: 'numeric', month: 'short', day: 'numeric' }),
               total: orderTotal,
               subtotal: orderSubtotal,
               delivery: orderDelivery,
               discount: orderDiscount,
               paymentMethod: this.selectedPayment,
-              shipping: { ...this.shipping },
-              items: orderItems
+              status: 'pending',
+              shipping: { ...this.shipping, district: this.selectedDistrict },
+              items: orderItems.map(i => ({
+                id: i.cart_item_id,
+                product_id: i.product_id,
+                product_title: i.details.name,
+                variant_label: i.details.variant,
+                variant_image: i.details.image,
+                price_at_purchase: i.details.price,
+                qty: i.qty,
+                details: i.details
+              }))
             });
 
             this.processingOrder = false;
@@ -3386,6 +3530,7 @@
         },
 
         continueShopping() {
+          this.filteredProducts = [...this.allProducts];
           this.currentView = 'home';
           this.checkoutStep = 1;
           this.selectedPayment = '';
@@ -3396,6 +3541,7 @@
           this.processingOrder = false;
           this.promoApplied = null;
           this.promoCode = '';
+          this._promoMinOrder = 0;
           window.scrollTo({ top: 0, behavior: 'instant' });
         },
 
@@ -3541,16 +3687,18 @@
         async saveProfile() {
           if (!this.userData?.id) return;
           try {
-            await supabaseClient.from('profiles').update({
+            const { error } = await supabaseClient.from('profiles').update({
               name: this.userData.name,
               phone: this.userData.phone,
-              email: this.userData.email
+              email: this.userData.email,
+              updated_at: new Date().toISOString()
             }).eq('id', this.userData.id);
+            if (error) throw error;
             this.saveToStorage();
             this.showNotification('Profile saved!');
           } catch (e) {
             console.error('Save profile failed:', e);
-            this.showNotification('Failed to save profile');
+            this.showNotification('Failed to save profile. Please try again.');
           }
         },
 
@@ -3561,6 +3709,7 @@
           this.shipping.phone = addr.phone || '';
           this.shipping.address = addr.details || '';
           if (addr.district) this.selectedDistrict = addr.district;
+          if (addr.upazilla) this.shipping.upazilla = addr.upazilla;
           this.showNotification('Address loaded');
         },
 
@@ -3576,6 +3725,7 @@
                   name: this.newAddr.name,
                   phone: this.newAddr.phone,
                   district: this.newAddr.district,
+                  upazilla: this.newAddr.upazilla,
                   details: this.newAddr.details
                 })
                 .select()
@@ -3586,7 +3736,7 @@
               this.savedAddresses.push({ ...this.newAddr });
             }
             this.showAddAddr = false;
-            this.newAddr = { label: '', name: '', phone: '', district: '', details: '' };
+            this.newAddr = { label: '', name: '', phone: '', district: '', upazilla: '', details: '' };
             this.showNotification('Address saved!');
           } catch (e) {
             console.error('Add address failed:', e);
@@ -3613,6 +3763,7 @@
         },
 
         async deleteAddress(addressId, idx) {
+          const wasDefault = this.savedAddresses[idx]?.is_default;
           try {
             const { error } = await supabaseClient
               .from('saved_addresses')
@@ -3621,6 +3772,9 @@
               .eq('user_id', this.userData.id);
             if (error) throw error;
             this.savedAddresses.splice(idx, 1);
+            if (wasDefault && this.savedAddresses.length === 1) {
+              await this.setDefaultAddress(this.savedAddresses[0].id);
+            }
             this.showNotification('Address removed.');
           } catch (e) {
             console.error('Delete address failed:', e);
@@ -3635,7 +3789,10 @@
         viewJustPlacedOrder() {
           this.authModalOpen = true;
           this.dashTab = 'orders';
-          this.$nextTick(() => { this.expandedOrderId = this.generatedOrderId.replace('#', ''); });
+          const orderId = this.generatedOrderId.replace('#', '');
+          this.$nextTick(() => {
+            this.expandedOrderId = orderId;
+          });
         },
 
         async trackGuestOrder() {
@@ -3667,9 +3824,12 @@
 
         /* ========== NEWSLETTER ========== */
         submitNewsletter() {
-          if (this.nlEmail && this.nlEmail.includes('@')) {
+          const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (this.nlEmail && emailRx.test(this.nlEmail.trim())) {
             this.nlSubmitted = true;
             this.showNotification('Subscribed! Check your inbox for your discount code.');
+          } else {
+            this.showNotification('Please enter a valid email address.');
           }
         },
 
@@ -3682,9 +3842,11 @@
         },
 
         /* ========== PDP ========== */
-        goToProduct(productId) {
-          const p = this.allProducts.find(pr => pr.id === productId);
+        async goToProduct(productId) {
+          let p = this.allProducts.find(pr => pr.id === productId);
           if (!p) return;
+          const fullProduct = await this.fetchFullProduct(productId);
+          if (fullProduct) p = fullProduct;
           const cat = this.allCategories.find(c => c.id === p.category_id);
           const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
           const variants = this.allVariants.filter(v => v.product_id === productId && v.is_active).map(v => ({
@@ -3707,7 +3869,7 @@
           this.currentView = 'product';
           window.scrollTo({ top: 0, behavior: 'instant' });
         },
-        goHome() { this.currentView = 'home'; this.bottomNavActive = 'home'; window.scrollTo({ top: 0, behavior: 'instant' }); },
+        goHome() { this.currentView = 'home'; this.bottomNavActive = 'home'; this.filteredProducts = [...this.allProducts]; window.scrollTo({ top: 0, behavior: 'instant' }); },
         pdpSelectVariant(variant) { this.pdpSelectedVariant = variant; this.pdpMainImageSrc = variant.variant_image || this.pdpProduct?.main_image; },
         pdpSetMainImage(url) { this.pdpMainImageSrc = url; },
         handlePdpAddToCart() {
