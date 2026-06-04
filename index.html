@@ -456,6 +456,10 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
           Sale
         </a>
+        <a href="#" @click.prevent="if(isLoggedIn){ authModalOpen = true; dashTab = 'orders'; } else { authModalOpen = true; authTab = 2; } closeSidebar();" class="flex items-center gap-3 py-2.5 text-base-muted font-medium hover:text-base-fg transition-smooth">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <span x-text="isLoggedIn ? 'My Orders' : 'Order History'"></span>
+        </a>
       </nav>
 
       <!-- Categories section -->
@@ -2862,6 +2866,8 @@
               p_session_id: this.sessionId
             });
             if (error) throw error;
+            // Clear guest order history from localStorage — now claimed in Supabase
+            try { localStorage.removeItem('vibe_guest_orders'); } catch(e) {}
             // Re-fetch cart so it now reflects the merged/claimed cart
             await this.fetchActiveCart();
           } catch (e) {
@@ -2880,6 +2886,8 @@
             const savedShipping = JSON.parse(localStorage.getItem('vibe_shipping') || 'null');
             if (savedShipping) this.shipping = { ...this.shipping, ...savedShipping };
           } catch(e) {}
+          // Restore guest order history before auth check
+          this._restoreGuestOrdersFromStorage();
 
           const { data: { session: existingSession } } = await supabaseClient.auth.getSession();
           if (existingSession?.user) {
@@ -2888,9 +2896,10 @@
             await this.fetchActiveCart();
           }
           this._authInitialized = true;
+          // NOTE: _authInitialized is set BEFORE registering the listener.
+          // The guard inside the listener is removed — it was causing the race.
 
           supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (!this._authInitialized) return;
             if (session?.user && event === 'SIGNED_IN') {
               await this._handleAuthUser(session.user);
             } else if (event === 'SIGNED_OUT') {
@@ -3462,7 +3471,7 @@
                   ...paymentInfo,
                   turnstile_token: this.turnstileToken  // Store for server-side verification if needed
                 },
-                shipping_snapshot: { ...this.shipping, district: this.selectedDistrict },
+                shipping_snapshot: { ...this.shipping, district: this.selectedDistrict, phone: this.shipping.phone.replace(/\s/g, '') },
                 status: 'pending'
               })
               .select()
@@ -3517,6 +3526,9 @@
                 details: i.details
               }))
             });
+
+            // Persist guest order history to localStorage
+            this._saveGuestOrdersToStorage();
 
             this.processingOrder = false;
             this.checkoutStep = 3;
@@ -3653,6 +3665,9 @@
             } else if (data.session) {
               this.showNotification(`Welcome to Vibe, ${this.regName.trim().split(' ')[0]}!`);
               this.authModalOpen = false;
+              // Belt-and-suspenders: directly hydrate auth state in case onAuthStateChange
+              // already fired or is suppressed by some SDK versions.
+              await this._handleAuthUser(data.session.user);
             }
             this.regName = ''; this.regEmail = ''; this.regPhone = '';
             this.regPassword = ''; this.regConfirmPassword = '';
@@ -3661,6 +3676,7 @@
             if (msg.includes('already registered') || msg.includes('User already registered')) {
               msg = 'This email is already registered. Please sign in instead.';
               this.authTab = 0;
+              this.signInEmail = this.regEmail.trim();
             } else if (msg.includes('Password should be') || msg.includes('password')) {
               msg = 'Password must be at least 6 characters.';
             } else if (msg.includes('over_email_send_rate_limit') || msg.includes('rate') || msg.includes('too_many')) {
@@ -3788,18 +3804,27 @@
 
         viewJustPlacedOrder() {
           this.authModalOpen = true;
-          this.dashTab = 'orders';
-          const orderId = this.generatedOrderId.replace('#', '');
-          this.$nextTick(() => {
-            this.expandedOrderId = orderId;
-          });
+          if (this.isLoggedIn) {
+            this.dashTab = 'orders';
+            const orderId = this.generatedOrderId.replace('#', '');
+            this.$nextTick(() => {
+              this.expandedOrderId = orderId;
+            });
+          } else {
+            // Guest: pre-fill Track Order tab so they can immediately view their order
+            this.authTab = 2;
+            this.trackOrderId = this.generatedOrderId.replace('#', '');
+            this.trackPhone = this.shipping.phone.replace(/\s/g, '');
+            this.trackedOrder = null;
+            this.trackOrderError = '';
+          }
         },
 
         async trackGuestOrder() {
           this.trackedOrder = null;
           this.trackOrderError = '';
           const orderId = this.trackOrderId.trim().replace('#', '').toUpperCase();
-          const phone = this.trackPhone.trim();
+          const phone = this.trackPhone.trim().replace(/\s/g, '');
           if (!orderId) { this.trackOrderError = 'Please enter your Order ID.'; return; }
           if (!phone) { this.trackOrderError = 'Please enter your phone number for verification.'; return; }
           this.authLoading = true;
@@ -3839,6 +3864,28 @@
           if (this.toastTimeout) clearTimeout(this.toastTimeout);
           this.toastMessage = msg; this.showToast = true;
           this.toastTimeout = setTimeout(() => { this.showToast = false; }, 3000);
+        },
+
+        /* ========== GUEST ORDER STORAGE ========== */
+        _saveGuestOrdersToStorage() {
+          // Only run when not logged in
+          if (this.isLoggedIn) return;
+          try {
+            // Store up to last 20 guest orders; keep full order objects
+            const toSave = this.orders.slice(0, 20);
+            localStorage.setItem('vibe_guest_orders', JSON.stringify(toSave));
+          } catch(e) { /* localStorage unavailable — silently fail */ }
+        },
+
+        _restoreGuestOrdersFromStorage() {
+          try {
+            const raw = localStorage.getItem('vibe_guest_orders');
+            if (!raw) return;
+            const stored = JSON.parse(raw);
+            if (Array.isArray(stored) && stored.length > 0) {
+              this.orders = stored;
+            }
+          } catch(e) { /* malformed JSON — ignore */ }
         },
 
         /* ========== PDP ========== */
