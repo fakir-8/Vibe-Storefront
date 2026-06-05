@@ -2778,21 +2778,17 @@
         async fetchActiveCart() {
           try {
             const userId = this.userData?.id || null;
-            const { data, error } = await supabaseClient.rpc('get_or_create_cart', {
+            // Use SECURITY DEFINER RPC — bypasses RLS for both anon and authenticated
+            const { data, error } = await supabaseClient.rpc('get_cart_items', {
               p_user_id: userId,
               p_session_id: this.sessionId
             });
             if (error) throw error;
-            this.activeCartId = data;
 
-            // Fetch cart items
-            const { data: items, error: itemsError } = await supabaseClient
-              .from('cart_items')
-              .select('*')
-              .eq('cart_id', this.activeCartId);
-            if (itemsError) throw itemsError;
+            this.activeCartId = data.cart_id;
+            const items = data.items || [];
 
-            this.cart = (items || []).map(ci => ({
+            this.cart = items.map(ci => ({
               product_id: ci.product_id,
               variant_id: ci.product_variant_id,
               qty: ci.qty,
@@ -3102,58 +3098,44 @@
         async triggerAddToCart(productId) {
           const p = this.allProducts.find(pr => pr.id === productId);
           if (!p) return;
-          const cartReady = await this.ensureActiveCart();
-          if (!cartReady) {
-            this.showNotification('Could not initialize cart. Please refresh and try again.');
-            return;
-          }
           const variant = this.allVariants.find(v => v.product_id === productId && v.is_active);
           const variantId = variant ? variant.id : null;
-          const vId = variantId ?? null;
-          const existing = vId !== null
-            ? this.cart.find(c => (c.variant_id ?? null) === vId)
-            : this.cart.find(c => (c.variant_id ?? null) === null && c.product_id === productId);
           try {
+            // Use SECURITY DEFINER RPC — bypasses RLS, handles get-or-create + upsert atomically
+            const userId = this.userData?.id || null;
+            const { data, error } = await supabaseClient.rpc('add_to_cart', {
+              p_user_id: userId,
+              p_session_id: this.sessionId,
+              p_product_id: productId,
+              p_product_variant_id: variantId,
+              p_qty: 1
+            });
+            if (error) throw error;
+
+            this.activeCartId = data.cart_id;
+            const vId = variantId ?? null;
+            const existing = vId !== null
+              ? this.cart.find(c => (c.variant_id ?? null) === vId)
+              : this.cart.find(c => (c.variant_id ?? null) === null && c.product_id === productId);
+
             if (existing) {
-              const newQty = existing.qty + 1;
-              const { error } = await supabaseClient
-                .from('cart_items')
-                .update({ qty: newQty, selected: true })
-                .eq('id', existing.cart_item_id);
-              if (error) throw error;
-              existing.qty = newQty;
+              existing.qty += 1;
               existing.selected = true;
               this.cart = [...this.cart];
             } else {
-              const { data, error } = await supabaseClient
-                .from('cart_items')
-                .insert({
-                  cart_id: this.activeCartId,
-                  product_id: productId,
-                  product_variant_id: variantId,
-                  qty: 1,
-                  selected: true
-                })
-                .select()
-                .single();
-              if (error) throw error;
               this.cart = [...this.cart, {
                 product_id: productId,
                 variant_id: variantId,
                 qty: 1,
                 selected: true,
-                cart_item_id: data.id
+                cart_item_id: data.cart_item_id
               }];
             }
             this.showNotification('Added to cart!');
             this.openCartDrawer(true);
           } catch (e) {
             console.error('Add to cart failed:', e.message, e.code, e.details, e);
-            const hint = (e.code === '42501' || (e.message && e.message.includes('permission denied')))
-              ? ' Permission error — ensure Supabase SQL fix block has been run (sequence grants).'
-              : '';
-            this.showNotification('Failed to add to cart.' + hint);
-            // Reset cart state so next attempt re-initializes
+            this.showNotification('Failed to add to cart. Please try again.');
             this.activeCartId = null;
           }
         },
@@ -3169,61 +3151,31 @@
         async confirmAddToCart() {
           const items = Object.entries(this.cartItems).filter(([id, data]) => data.qty > 0);
           if (!items.length) return;
-          const cartReady = await this.ensureActiveCart();
-          if (!cartReady) {
-            this.showNotification('Could not initialize cart. Please refresh and try again.');
-            return;
-          }
           try {
-            const toInsert = [];
-            const toUpdate = [];
+            // Build payload for batch_add_to_cart SECURITY DEFINER RPC
+            const batchItems = [];
+            const variantMap = {};
             for (const [variantId, data] of items) {
               const variant = this.modalVariants.find(v => v.id == variantId);
               if (!variant) continue;
               const vId = variantId != null ? Number(variantId) : null;
-              const existing = this.cart.find(c => {
-                const cVid = c.variant_id ?? null;
-                return vId !== null ? cVid === vId : (cVid === null && c.product_id === variant.product_id);
+              batchItems.push({
+                product_id: variant.product_id,
+                product_variant_id: vId,
+                qty: data.qty
               });
-              if (existing) {
-                toUpdate.push({ item: existing, qty: existing.qty + data.qty });
-              } else {
-                toInsert.push({
-                  cart_id: this.activeCartId,
-                  product_id: variant.product_id,
-                  product_variant_id: vId,
-                  qty: data.qty,
-                  selected: true,
-                  _variantId: vId,
-                  _productId: variant.product_id
-                });
-              }
+              variantMap[variant.product_id + '_' + vId] = { vId, product_id: variant.product_id, qty: data.qty };
             }
-            for (const { item, qty } of toUpdate) {
-              const { error } = await supabaseClient
-                .from('cart_items').update({ qty, selected: true }).eq('id', item.cart_item_id);
-              if (error) throw error;
-              item.qty = qty;
-              item.selected = true;
-            }
-            if (toInsert.length) {
-              const insertPayload = toInsert.map(({ cart_id, product_id, product_variant_id, qty, selected }) =>
-                ({ cart_id, product_id, product_variant_id, qty, selected })
-              );
-              const { data: inserted, error } = await supabaseClient
-                .from('cart_items').insert(insertPayload).select();
-              if (error) throw error;
-              for (let i = 0; i < inserted.length; i++) {
-                this.cart.push({
-                  product_id: toInsert[i]._productId,
-                  variant_id: toInsert[i]._variantId,
-                  qty: toInsert[i].qty,
-                  selected: true,
-                  cart_item_id: inserted[i].id
-                });
-              }
-            }
-            this.cart = [...this.cart];
+            const userId = this.userData?.id || null;
+            const { data, error } = await supabaseClient.rpc('batch_add_to_cart', {
+              p_user_id: userId,
+              p_session_id: this.sessionId,
+              p_items: batchItems
+            });
+            if (error) throw error;
+            this.activeCartId = data.cart_id;
+            // Refresh cart from server to ensure sync
+            await this.fetchActiveCart();
             const n = items.reduce((s, [, d]) => s + d.qty, 0);
             this.closeModal();
             this.showNotification(n + ' item' + (n !== 1 ? 's' : '') + ' added to cart!');
@@ -3239,10 +3191,11 @@
         async updateCartItemSelection(item) {
           if (!item.cart_item_id) return;
           try {
-            await supabaseClient
-              .from('cart_items')
-              .update({ selected: item.selected })
-              .eq('id', item.cart_item_id);
+            await supabaseClient.rpc('update_cart_item', {
+              p_cart_item_id: item.cart_item_id,
+              p_qty: item.qty,
+              p_selected: item.selected
+            });
           } catch (e) {
             console.error('Failed to update cart item selection:', e);
           }
@@ -3256,7 +3209,7 @@
           });
           if (!item) return;
           try {
-            await supabaseClient.from('cart_items').delete().eq('id', item.cart_item_id);
+            await supabaseClient.rpc('delete_cart_items', { p_ids: [item.cart_item_id] });
             this.cart = this.cart.filter(c => c.cart_item_id !== item.cart_item_id);
             this.showNotification('Item removed');
           } catch (e) {
@@ -3274,10 +3227,11 @@
           if (!item) return;
           const newQty = Math.max(1, item.qty + delta);
           try {
-            await supabaseClient
-              .from('cart_items')
-              .update({ qty: newQty })
-              .eq('id', item.cart_item_id);
+            await supabaseClient.rpc('update_cart_item', {
+              p_cart_item_id: item.cart_item_id,
+              p_qty: newQty,
+              p_selected: item.selected
+            });
             item.qty = newQty;
             this.cart = [...this.cart];
           } catch (e) {
@@ -3584,10 +3538,10 @@
               .insert(orderItemsInsert);
             if (itemsError) throw itemsError;
 
-            // Delete selected cart items from Supabase
+            // Delete selected cart items from Supabase (use SECURITY DEFINER RPC)
             const selectedItemIds = this.selectedCartItems.map(i => i.cart_item_id).filter(Boolean);
             if (selectedItemIds.length) {
-              await supabaseClient.from('cart_items').delete().in('id', selectedItemIds);
+              await supabaseClient.rpc('delete_cart_items', { p_ids: selectedItemIds });
             }
 
             // Remove selected items from local cart
