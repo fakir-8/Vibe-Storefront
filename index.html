@@ -1744,7 +1744,7 @@
 
           <div class="mt-8 text-center phase-enter">
             <button @click="continueShopping()" class="px-8 py-3.5 rounded-xl bg-base-fg text-white font-semibold hover:bg-base-fg/90 transition-smooth btn-press shadow-lg">Continue Shopping</button>
-            <button x-show="isLoggedIn" @click="viewJustPlacedOrder()" class="px-6 py-2.5 rounded-xl border border-base-fg text-base-fg font-semibold text-sm hover:bg-base-surface transition-smooth btn-press">View Order Details</button>
+            <button @click="viewJustPlacedOrder()" class="px-6 py-2.5 rounded-xl border border-base-fg text-base-fg font-semibold text-sm hover:bg-base-surface transition-smooth btn-press">View Order Details</button>
           </div>
         </div>
 
@@ -2001,7 +2001,7 @@
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><input x-model="regPassword" type="password" placeholder="Create a password" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Confirm Password</label><input x-model="regConfirmPassword" type="password" placeholder="Confirm your password" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <!-- Error message for register -->
-              <div x-show="authError && authTab === 1" x-transition class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+              <div x-show="authError" x-transition class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
                 <svg class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-xs font-medium text-red-600" x-text="authError"></span>
               </div>
@@ -2012,7 +2012,40 @@
             </div>
             <!-- Track Order -->
             <div x-show="authTab === 2" class="space-y-3">
-              <div class="bg-base-surface rounded-xl p-3 mb-2"><p class="text-xs text-base-muted leading-relaxed">Track your guest order from any device.</p></div>
+              <!-- Guest order history list (if any exist in localStorage) -->
+              <template x-if="orders.length > 0">
+                <div>
+                  <button @click="guestOrderHistoryOpen = !guestOrderHistoryOpen"
+                          class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-base-surface border border-base-border hover:border-base-fg transition-smooth mb-3">
+                    <span class="text-xs font-bold text-base-fg flex items-center gap-2">
+                      <svg class="w-4 h-4 text-base-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                      Your Recent Orders (<span x-text="orders.length"></span>)
+                    </span>
+                    <svg class="w-4 h-4 text-base-muted transition-smooth" :style="guestOrderHistoryOpen ? 'transform:rotate(180deg)' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                  <div x-show="guestOrderHistoryOpen" x-transition class="space-y-2 mb-3">
+                    <template x-for="order in orders" :key="order.id">
+                      <div class="bg-base-surface rounded-xl border border-base-border p-3">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="font-bold text-xs text-base-fg" x-text="'#' + order.id"></span>
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                                :class="{
+                                  'bg-amber-100 text-amber-700': order.status === 'pending',
+                                  'bg-blue-100 text-blue-700': order.status === 'confirmed',
+                                  'bg-purple-100 text-purple-700': order.status === 'packaged',
+                                  'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(order.status),
+                                  'bg-red-100 text-red-600': order.status === 'cancelled'
+                                }"
+                                x-text="order.status || 'pending'"></span>
+                        </div>
+                        <p class="text-[11px] text-base-muted" x-text="order.date + ' · ' + (order.items?.length || 0) + ' item(s) · ' + formatPrice(order.total)"></p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <!-- Manual order tracking -->
+              <div class="bg-base-surface rounded-xl p-3 mb-2"><p class="text-xs text-base-muted leading-relaxed">Track any order using your Order ID and phone number.</p></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Order ID</label><input x-model="trackOrderId" type="text" placeholder="#VBE-00000" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Phone Number</label><input x-model="trackPhone" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <button @click="trackGuestOrder()" :disabled="authLoading" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50">Track Status</button>
@@ -2514,6 +2547,7 @@
         trackOrderId: '', trackPhone: '',
         trackedOrder: null,
         trackOrderError: '',
+        guestOrderHistoryOpen: false,
         dashTab: 'orders',
         orders: [],
         expandedOrderId: null,
@@ -2900,8 +2934,11 @@
           // The guard inside the listener is removed — it was causing the race.
 
           supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user && event === 'SIGNED_IN') {
-              await this._handleAuthUser(session.user);
+            if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+              // Only hydrate if not already logged in as this user (prevents double-hydrate on initial load)
+              if (!this.isLoggedIn || this.userData?.id !== session.user.id) {
+                await this._handleAuthUser(session.user);
+              }
             } else if (event === 'SIGNED_OUT') {
               this.isLoggedIn = false;
               this.userData = null;
@@ -2913,7 +2950,14 @@
 
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
-          this.$watch('authTab', () => { this.authError = ''; this.authSuccessMsg = ''; });
+          this.$watch('authTab', (newTab, oldTab) => {
+            // Only clear errors when the USER manually switches tabs (not programmatic tab switches during auth flows).
+            // We detect programmatic switches by checking if authLoading is true.
+            if (!this.authLoading) {
+              this.authError = '';
+              this.authSuccessMsg = '';
+            }
+          });
           this.$watch('cartSubtotal', (newVal) => {
             if (this.promoApplied && this._promoMinOrder && newVal < this._promoMinOrder) {
               this.promoApplied = null;
@@ -3675,8 +3719,17 @@
             let msg = e.message || 'Registration failed';
             if (msg.includes('already registered') || msg.includes('User already registered')) {
               msg = 'This email is already registered. Please sign in instead.';
-              this.authTab = 0;
+              // Pre-fill sign-in form before switching tab (watcher will NOT clear authError because authLoading is still true)
               this.signInEmail = this.regEmail.trim();
+              this.regPassword = '';
+              this.regConfirmPassword = '';
+              this.authTab = 0;
+              this.authSuccessMsg = 'Email pre-filled from your registration attempt — just enter your password.';
+              // Auto-focus password field after tab switch
+              this.$nextTick(() => {
+                const pwField = document.querySelector('input[x-model="signInPassword"]');
+                if (pwField) pwField.focus();
+              });
             } else if (msg.includes('Password should be') || msg.includes('password')) {
               msg = 'Password must be at least 6 characters.';
             } else if (msg.includes('over_email_send_rate_limit') || msg.includes('rate') || msg.includes('too_many')) {
@@ -3693,6 +3746,12 @@
         async signOut() {
           try {
             await supabaseClient.auth.signOut();
+            // Generate a fresh session ID so the post-signout guest gets a clean cart
+            try {
+              localStorage.removeItem('vibe_session_id');
+              localStorage.removeItem('vibe_guest_orders');
+            } catch(e) {}
+            this.generateSessionId();
             this.showNotification('Signed out successfully');
           } catch (e) {
             console.error('Sign out failed:', e);
