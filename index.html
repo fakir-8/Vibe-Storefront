@@ -1430,7 +1430,11 @@
                 <p x-show="validationErrors.phone" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.phone"></p>
               </div>
               <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Alternative Number <span class="text-base-muted font-normal">(optional)</span></label><input id="shipping-altPhone" x-model="shipping.altPhone" @input="saveToStorage(); validationErrors.altPhone = ''" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="validationErrors.altPhone" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.altPhone"></p></div>
-              <div><label class="block text-sm font-semibold text-base-fg mb-1.5">Email Address <span class="text-base-muted font-normal">(optional)</span></label><input id="shipping-email" x-model="shipping.email" @input="saveToStorage(); validationErrors.email = ''" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="validationErrors.email" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.email"></p></div>
+              <div>
+                <label class="block text-sm font-semibold text-base-fg mb-1.5">Email Address *</label>
+                <input id="shipping-email" x-model="shipping.email" @input="saveToStorage(); validationErrors.email = ''" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border text-sm font-medium checkout-input transition-smooth" :class="validationErrors.email ? 'border-red-500 bg-red-50/30' : 'border-base-border'">
+                <p x-show="validationErrors.email" x-transition class="text-xs font-medium text-red-500 mt-1" x-text="validationErrors.email"></p>
+              </div>
               <div>
                 <label class="block text-sm font-semibold text-base-fg mb-1.5">District <span class="text-base-muted font-normal text-xs">(can be changed)</span></label>
                 <select id="shipping-district" x-model="selectedDistrict"
@@ -1475,6 +1479,20 @@
                   <button @click="regName = shipping.name || ''; regEmail = shipping.email || ''; regPhone = shipping.phone || ''; authModalOpen = true; authTab = 1;" class="mt-3 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold transition-smooth">Create Account</button>
                 </div>
               </div>
+            </div>
+
+            <!-- Human Verification (Turnstile) — before proceeding to payment -->
+            <div class="mt-4 bg-base-card rounded-2xl border border-base-border p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <svg class="w-4 h-4 text-base-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span class="text-sm font-semibold text-base-fg">Verify you're human</span>
+              </div>
+              <div id="turnstile-container-shipping" class="min-h-[70px]"></div>
+              <p x-show="!turnstileVerified" class="text-xs text-base-muted mt-2">Complete the verification above before continuing to payment.</p>
+              <p x-show="turnstileVerified" class="text-xs text-base-success font-medium mt-2 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Verified — you may proceed to payment.
+              </p>
             </div>
 
 
@@ -1895,8 +1913,7 @@
         </template>
       </div>
 
-      <!-- Cloudflare Turnstile -->
-      <div id="turnstile-container" class="px-5 mt-3 min-h-[70px]"></div>
+      <!-- Cloudflare Turnstile removed from here — now on shipping details page -->
       <!-- Friction Checkbox -->
       <div class="px-5">
         <label class="flex items-start gap-3 bg-base-surface p-3.5 rounded-xl border border-base-border cursor-pointer select-none my-3">
@@ -2434,7 +2451,7 @@
       <!-- Account -->
       <button @click="bottomNavActive = 'account'; authModalOpen = true;" class="flex flex-col items-center gap-1 py-1 transition-smooth" :class="bottomNavActive === 'account' ? 'text-base-accent' : 'text-base-muted hover:text-base-fg'">
         <svg class="w-5 h-5" :fill="bottomNavActive === 'account' ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-        <span class="text-[10px] font-medium" x-text="isLoggedIn ? 'Account' : 'Login'"></span>
+        <span class="text-[10px] font-medium truncate max-w-[50px]" x-text="isLoggedIn ? (userData?.name || 'Account').split(' ')[0] : 'Login'"></span>
       </button>
     </div>
   </nav>
@@ -2448,7 +2465,14 @@
        ============================================================ */
     const SUPABASE_URL = 'https://qfjiovpsypbzkvalcuox.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmamlvdnBzeXBiemt2YWxjdW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjM5ODAsImV4cCI6MjA5NTYzOTk4MH0.QJV1ckOy_VsHTi6DAFebJuzo6EliUr5EmATqLOEo14Q';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage
+      }
+    });
 
     function storefront() {
       return {
@@ -2665,7 +2689,7 @@
           }
           return true;
         },
-        get canFinalConfirm() { return this.finalConfirmCheck && this.turnstileVerified; },
+        get canFinalConfirm() { return this.finalConfirmCheck; },
         get paymentValidationHint() {
           if (!this.selectedPayment) return 'Please select a payment method above.';
           if (this.selectedPayment === 'cod' && (!this.codPolicy1 || !this.codPolicy2)) return 'Please accept both COD policies above.';
@@ -3063,11 +3087,14 @@
               p_user_id: userId,
               p_session_id: this.sessionId
             });
-            if (error) throw error;
+            if (error) {
+              console.error('ensureActiveCart RPC error:', error.message, error.code, error.details);
+              throw error;
+            }
             this.activeCartId = data;
             return true;
           } catch (e) {
-            console.error('Could not create/get cart:', e);
+            console.error('Could not create/get cart:', e.message, e);
             return false;
           }
         },
@@ -3121,8 +3148,13 @@
             this.showNotification('Added to cart!');
             this.openCartDrawer(true);
           } catch (e) {
-            console.error('Add to cart failed:', e.message, e);
-            this.showNotification('Failed to add to cart. Please try again.');
+            console.error('Add to cart failed:', e.message, e.code, e.details, e);
+            const hint = (e.code === '42501' || (e.message && e.message.includes('permission denied')))
+              ? ' Permission error — ensure Supabase SQL fix block has been run (sequence grants).'
+              : '';
+            this.showNotification('Failed to add to cart.' + hint);
+            // Reset cart state so next attempt re-initializes
+            this.activeCartId = null;
           }
         },
 
@@ -3332,7 +3364,12 @@
           this.checkoutStep = 1;
           this.checkoutValidationMsg = '';
           this.validationErrors = {};
+          // Reset turnstile for fresh verification on each checkout entry
+          this.turnstileVerified = false;
+          this.turnstileToken = '';
           window.scrollTo({ top: 0, behavior: 'instant' });
+          // Mount Turnstile widget on the shipping page
+          this.$nextTick(() => { this.mountTurnstile(); });
         },
 
         goToCheckoutStep(step) {
@@ -3376,7 +3413,10 @@
               if (!firstErrorField) firstErrorField = 'shipping-address';
             }
 
-            if (this.shipping.email && this.shipping.email.trim()) {
+            if (!this.shipping.email || !this.shipping.email.trim()) {
+              this.validationErrors.email = 'Email address is required for order updates';
+              if (!firstErrorField) firstErrorField = 'shipping-email';
+            } else {
               const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
               if (!emailRx.test(this.shipping.email.trim())) {
                 this.validationErrors.email = 'Please enter a valid email address';
@@ -3389,6 +3429,16 @@
                 this.validationErrors.altPhone = 'Please enter a valid 11-digit phone number';
                 if (!firstErrorField) firstErrorField = 'shipping-altPhone';
               }
+            }
+
+            // Turnstile (human verification) check
+            if (!this.turnstileVerified) {
+              this.checkoutValidationMsg = 'Please complete the human verification below before continuing.';
+              this.$nextTick(() => {
+                const tc = document.getElementById('turnstile-container-shipping');
+                if (tc) tc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+              return;
             }
 
             if (Object.keys(this.validationErrors).length > 0) {
@@ -3425,15 +3475,14 @@
 
         showReconfirmModal() {
           this.finalConfirmCheck = false;
-          this.turnstileVerified = false;
-          this.turnstileToken = '';
           this.reconfirmModalOpen = true;
-          this.mountTurnstile();
+          // Turnstile no longer mounted here — it's on the shipping details page
         },
 
         mountTurnstile() {
           this.$nextTick(() => {
-            const container = document.getElementById('turnstile-container');
+            // Try shipping page container first, fall back to generic
+            const container = document.getElementById('turnstile-container-shipping') || document.getElementById('turnstile-container');
             if (!container) return;
             container.innerHTML = '';
             if (window.turnstile) {
@@ -3469,10 +3518,7 @@
 
         async confirmAndPlaceOrder() {
           if (!this.finalConfirmCheck) return;
-          if (!this.turnstileVerified) {
-            this.showNotification('Please complete the security verification (Turnstile).');
-            return;
-          }
+          // Turnstile already verified on shipping details page — token stored in this.turnstileToken
           if (!this.selectedDistrict) {
             this.reconfirmModalOpen = false;
             this.goToCheckoutStep(1);
@@ -3598,6 +3644,9 @@
           this.promoApplied = null;
           this.promoCode = '';
           this._promoMinOrder = 0;
+          // Reset turnstile for next checkout
+          this.turnstileVerified = false;
+          this.turnstileToken = '';
           window.scrollTo({ top: 0, behavior: 'instant' });
         },
 
@@ -3724,6 +3773,8 @@
               this.regPassword = '';
               this.regConfirmPassword = '';
               this.authTab = 0;
+              // authError is set below — it shows in RED on the sign-in tab.
+              // Also set a green helper message to explain the pre-fill.
               this.authSuccessMsg = 'Email pre-filled from your registration attempt — just enter your password.';
               // Auto-focus password field after tab switch
               this.$nextTick(() => {
