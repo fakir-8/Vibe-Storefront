@@ -114,9 +114,7 @@
       position: fixed; inset: 0;
       background: rgba(248,246,243,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       z-index: 300; display: flex; align-items: flex-start; justify-content: center;
-      padding: 5rem 1rem 1rem; opacity: 0; visibility: hidden; transition: all 0.25s ease;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      padding: 5.5rem 1rem 2rem; opacity: 0; visibility: hidden; transition: all 0.25s ease;
     }
     .search-overlay.active { opacity: 1; visibility: visible; }
 
@@ -660,7 +658,8 @@
       <!-- Proceed to Checkout -->
       <button @click="proceedToCheckout()"
               :disabled="cartSelectedCount === 0 || !selectedDistrict"
-              class="w-full py-3.5 px-6 bg-base-accent text-white font-medium rounded-xl hover:bg-base-accentHover transition-smooth btn-press disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              :class="{'opacity-50': cartSelectedCount === 0 || !selectedDistrict}"
+              class="w-full py-3.5 px-6 bg-base-accent text-white font-medium rounded-xl hover:bg-base-accentHover transition-smooth btn-press flex items-center justify-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
         Proceed to Checkout
       </button>
@@ -695,7 +694,7 @@
       <!-- Search results -->
       <div x-show="searchQuery && searchQuery.trim().length > 0" class="mt-4">
         <p class="text-sm text-base-muted mb-3" x-text="searchResultsCount + ' product' + (searchResultsCount !== 1 ? 's' : '') + ' found'"></p>
-        <div class="space-y-2 overflow-y-auto custom-scroll" style="max-height: min(60vh, calc(100dvh - 220px))">
+        <div class="space-y-2 max-h-[65vh] overflow-y-auto overscroll-contain custom-scroll">
           <template x-for="product in searchResultsDisplay" :key="'search-'+product.id">
             <button @click="goToProduct(product.id); closeSearch();" class="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-base-border hover:border-base-fg transition-smooth text-left">
               <img :src="product.main_image" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
@@ -707,11 +706,11 @@
             </button>
           </template>
         </div>
-        <div x-show="searchHasMore" class="mt-3 text-center">
-          <button @click="loadMoreSearchResults()" class="text-sm font-semibold text-base-accent hover:text-base-accentHover transition-smooth">Show more results</button>
+        <div x-show="hasMoreProducts" class="mt-3 text-center">
+          <button @click="loadMoreProducts()" class="text-sm font-semibold text-base-accent hover:text-base-accentHover transition-smooth">Show more results</button>
         </div>
       </div>
-      <div x-show="searchQuery.trim() && !searchLoading && searchResultsCount === 0" class="text-center py-12">
+      <div x-show="searchQuery.trim() && !searchLoading && filteredProducts.length === 0" class="text-center py-12">
         <p class="text-base-muted font-medium">No results for "<span x-text="searchQuery"></span>"</p>
         <p class="text-sm text-base-muted mt-1">Try a different keyword or browse by category</p>
       </div>
@@ -753,7 +752,7 @@
             <span x-show="cartItemCount > 0" class="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-base-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center" x-text="cartItemCount"></span>
           </button>
           <!-- Account (desktop) -->
-          <button @click="goToAccount()"
+          <button @click="authModalOpen = true"
                   class="hidden lg:flex p-2 rounded-xl hover:bg-base-surface transition-smooth relative items-center gap-1.5"
                   aria-label="Account">
             <svg class="w-5 h-5 text-base-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1304,7 +1303,7 @@
           <div class="max-w-4xl mx-auto px-4">
             <div class="flex items-center justify-between mb-8">
               <h2 class="font-display text-2xl font-semibold text-base-fg">Customer Reviews</h2>
-
+              <!-- Admin review tools removed (Req 2) -->
             </div>
             <div class="flex flex-col sm:flex-row gap-8 mb-10 p-6 bg-base-surface rounded-2xl border border-base-border">
               <div class="flex flex-col items-center justify-center min-w-[100px]">
@@ -1386,6 +1385,64 @@
                 <button @click="openAllReviewsModal(pdpProduct.id)" class="px-8 py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press">See All <span x-text="getApprovedReviews(pdpProduct?.id).length"></span> Reviews</button>
               </div>
             </template>
+            <!-- Write a Review (Req 17) -->
+            <div x-show="canWriteReview(pdpProduct?.id)" class="mt-8 border-t border-base-border pt-6">
+              <div x-show="!reviewSubmitOpen">
+                <button @click="reviewSubmitOpen = true" class="px-6 py-2.5 rounded-xl bg-base-fg text-white text-sm font-semibold hover:bg-base-fg/90 transition-smooth btn-press flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  Write a Review
+                </button>
+              </div>
+              <div x-show="reviewSubmitOpen" class="bg-base-surface rounded-2xl border border-base-border p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-display text-lg font-semibold text-base-fg">Write a Review</h3>
+                  <button @click="reviewSubmitOpen = false" class="p-1.5 rounded-lg hover:bg-base-border/30 transition-smooth">
+                    <svg class="w-4 h-4 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+                <!-- Star rating -->
+                <div>
+                  <label class="block text-sm font-semibold text-base-fg mb-2">Rating</label>
+                  <div class="flex gap-1">
+                    <template x-for="star in [1,2,3,4,5]" :key="star">
+                      <button @click="newReview.rating = star" class="focus:outline-none transition-smooth" type="button">
+                        <svg class="w-7 h-7" :class="star <= newReview.rating ? 'text-yellow-400' : 'text-base-border'" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+                <!-- Title -->
+                <div>
+                  <label class="block text-sm font-semibold text-base-fg mb-1.5">Review Title *</label>
+                  <input x-model="newReview.title" type="text" placeholder="Summarize your experience" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input">
+                </div>
+                <!-- Body -->
+                <div>
+                  <label class="block text-sm font-semibold text-base-fg mb-1.5">Your Review *</label>
+                  <textarea x-model="newReview.body" rows="4" placeholder="Tell others about your experience with this product..." class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium resize-none checkout-input"></textarea>
+                </div>
+                <!-- Image upload -->
+                <div>
+                  <label class="block text-sm font-semibold text-base-fg mb-1.5">Photos <span class="text-base-muted font-normal">(optional)</span></label>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="const files = Array.from($event.target.files); newReview.imageFiles = [...(newReview.imageFiles || []), ...files]; newReview.images = [...(newReview.images || []), ...files.map(f => URL.createObjectURL(f))]" class="text-sm text-base-muted">
+                  <div x-show="newReview.images?.length" class="flex gap-2 mt-2 flex-wrap">
+                    <template x-for="(img, idx) in (newReview.images || [])" :key="idx">
+                      <div class="relative w-16 h-16 rounded-lg overflow-hidden border border-base-border">
+                        <img :src="img" class="w-full h-full object-cover">
+                        <button @click="newReview.images.splice(idx, 1); newReview.imageFiles.splice(idx, 1)" class="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white flex items-center justify-center text-[8px] rounded-bl-lg" type="button">X</button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <!-- Error -->
+                <p x-show="reviewUploadError" class="text-xs font-medium text-red-500" x-text="reviewUploadError"></p>
+                <!-- Submit -->
+                <button @click="submitReview(pdpProduct.id)" :disabled="newReview.uploading" class="w-full py-3 rounded-xl bg-base-success text-white font-semibold text-sm hover:opacity-90 transition-smooth btn-press disabled:opacity-50 flex items-center justify-center gap-2">
+                  <svg x-show="newReview.uploading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  <span x-text="newReview.uploading ? 'Submitting...' : 'Submit Review'"></span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1435,28 +1492,18 @@
           <div class="flex items-center justify-between">
             <template x-for="(step, idx) in [{n:1,l:'Shipping'},{n:2,l:'Payment'},{n:3,l:'Done'}]" :key="step.n">
               <div class="flex items-center" :class="idx < 2 ? 'flex-1' : ''">
-                <div class="flex flex-col items-center gap-1">
-                  <div class="step-circle w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer select-none"
-                       :class="checkoutStep > step.n
-                         ? 'bg-base-success text-white hover:opacity-80'
-                         : (checkoutStep === step.n ? 'bg-base-fg text-white' : 'bg-base-border text-base-muted')"
+                <div class="flex flex-col items-center">
+                  <div class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer select-none"
+                       :class="checkoutStep > step.n ? 'bg-base-success text-white hover:opacity-80' : (checkoutStep === step.n ? 'bg-base-fg text-white' : 'bg-base-border text-base-muted')"
                        @click="handleStepClick(step.n)">
-                    <template x-if="checkoutStep > step.n">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                      </svg>
-                    </template>
-                    <template x-if="checkoutStep <= step.n">
-                      <span x-text="step.n"></span>
-                    </template>
+                    <template x-if="checkoutStep > step.n"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                    <template x-if="checkoutStep <= step.n"><span x-text="step.n"></span></template>
                   </div>
-                  <span class="text-[10px] font-semibold select-none"
-                        :class="checkoutStep >= step.n ? 'text-base-fg' : 'text-base-muted'"
-                        x-text="step.l"
-                        @click="handleStepClick(step.n)"></span>
+                  <span class="text-[10px] font-semibold mt-1 cursor-pointer select-none"
+                        :class="checkoutStep >= step.n ? 'text-base-fg' : 'text-base-muted'" x-text="step.l" @click="handleStepClick(step.n)"></span>
                 </div>
                 <template x-if="idx < 2">
-                  <div class="flex-1 mx-2 h-0.5 rounded-full step-line mb-4"
+                  <div class="flex-1 mx-3 h-0.5 rounded-full step-line"
                        :class="checkoutStep > step.n ? 'bg-base-success' : 'bg-base-border'"></div>
                 </template>
               </div>
@@ -1470,20 +1517,15 @@
         <!-- =========== CHECKOUT STEP 1: SHIPPING =========== -->
         <div x-show="checkoutStep === 1" class="flex flex-col md:flex-row gap-6">
           <div class="flex-1 md:flex-[1.4]">
-            <!-- Step 1 header — mobile-friendly two-line layout -->
-            <div class="mb-4">
-              <h1 class="font-display text-xl font-semibold text-base-fg mb-2">Shipping Details</h1>
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <button @click="currentView = 'home'; checkoutStep = 1;"
-                  class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth flex items-center gap-1">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                  </svg>
+            <div class="flex flex-col gap-2 mb-4 md:flex-row md:items-center md:justify-between">
+              <h1 class="font-display text-xl md:text-2xl font-semibold text-base-fg">Shipping Details</h1>
+              <div class="flex justify-between md:justify-end md:gap-3">
+                <button @click="currentView = 'home'; checkoutStep = 1;" class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                   Back to Store
                 </button>
-                <button x-show="!isLoggedIn" @click="authModalOpen = true"
-                  class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth">
-                  Already have account? <span class="text-base-fg font-semibold underline">Log in</span>
+                <button x-show="!isLoggedIn" @click="authModalOpen = true" class="text-sm font-medium text-base-muted hover:text-base-accent transition-smooth">
+                  Already a customer? <span class="text-base-fg underline">Log in</span>
                 </button>
               </div>
             </div>
@@ -1643,13 +1685,7 @@
                 <div class="border-t border-base-border pt-2"><div class="flex justify-between"><span class="font-bold text-base-fg">Total</span><span class="font-display font-bold text-lg" x-text="selectedDistrict ? formatPrice(cartTotal) : '—'"></span></div></div>
               </div>
 
-              <button @click="goToCheckoutStep(2)"
-                class="w-full mt-4 py-3 px-6 rounded-xl font-medium transition-smooth btn-press"
-                :class="isShippingFormValid
-                  ? 'bg-base-fg text-white hover:bg-base-fg/90 cursor-pointer'
-                  : 'bg-base-fg/30 text-white/60 cursor-not-allowed'">
-                Continue to Payment
-              </button>
+              <button @click="goToCheckoutStep(2)" class="w-full mt-4 py-3 px-6 bg-base-fg text-white font-medium rounded-xl hover:bg-base-fg/90 transition-smooth btn-press">Continue to Payment</button>
             </div>
           </div>
         </div>
@@ -1800,12 +1836,7 @@
               <p x-show="paymentValidationHint && !canPlaceOrder"
                  class="text-xs text-red-500 font-medium mb-2 text-center"
                  x-text="paymentValidationHint"></p>
-              <button @click="placeOrder()"
-                :disabled="!canPlaceOrder"
-                class="w-full mt-4 py-3 px-6 rounded-xl font-medium text-sm btn-press"
-                :class="canPlaceOrder
-                  ? 'bg-base-success text-white hover:opacity-90 cursor-pointer'
-                  : 'bg-base-border text-base-muted cursor-not-allowed opacity-50'">
+              <button @click="placeOrder()" :class="{'opacity-50': !canPlaceOrder}" class="w-full mt-4 py-3 px-6 bg-base-success text-white font-medium rounded-xl hover:opacity-90 transition-smooth btn-press">
                 Place Order — <span x-text="formatPrice(cartTotal)"></span>
               </button>
             </div>
@@ -1914,12 +1945,9 @@
           <!-- Step 1 buttons: Shipping -->
           <div x-show="checkoutStep === 1" class="flex items-center gap-2">
             <button @click="currentView = 'home'; checkoutStep = 1;" class="px-4 py-2.5 rounded-xl border border-base-border text-base-muted font-semibold text-sm hover:bg-base-surface transition-smooth hidden md:block">Back to Store</button>
-            <button @click="goToCheckoutStep(2)"
-              class="w-full py-3.5 px-6 rounded-xl font-medium text-sm transition-smooth btn-press"
-              :class="isShippingFormValid
-                ? 'bg-base-accent text-white hover:bg-base-accentHover cursor-pointer'
-                : 'bg-base-accent/40 text-white/70 cursor-not-allowed'">
-              Continue to Payment →
+            <button @click="goToCheckoutStep(2)" class="px-6 py-2.5 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press flex items-center gap-2">
+              Continue to Payment
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
             </button>
           </div>
           <!-- Step 2 buttons: Payment -->
@@ -1930,12 +1958,7 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
               Shipping
             </button>
-            <button @click="placeOrder()"
-              :disabled="!canPlaceOrder"
-              class="px-6 py-2.5 rounded-xl font-semibold text-sm btn-press"
-              :class="canPlaceOrder
-                ? 'bg-base-success text-white hover:opacity-90 cursor-pointer'
-                : 'bg-base-border text-base-muted cursor-not-allowed opacity-50'">
+            <button @click="placeOrder()" :class="{'opacity-50': !canPlaceOrder}" class="px-6 py-2.5 rounded-xl bg-base-success text-white font-semibold text-sm hover:opacity-90 transition-smooth btn-press">
               Place Order
             </button>
           </div>
@@ -1943,245 +1966,6 @@
       </div>
 
     </div><!-- /checkout view -->
-
-    <!-- ==================== ACCOUNT DASHBOARD PAGE ==================== -->
-    <div x-show="currentView === 'account' && isLoggedIn"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         style="display:none;"
-         class="min-h-screen pb-24">
-
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <!-- Page header -->
-        <div class="flex items-center gap-4 mb-8">
-          <button @click="goHome()" class="w-10 h-10 rounded-xl bg-base-surface border border-base-border flex items-center justify-center hover:bg-base-border transition-smooth">
-            <svg class="w-5 h-5 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-          </button>
-          <div>
-            <h1 class="font-display text-2xl font-semibold text-base-fg" x-text="'Hello, ' + (userData?.name?.split(' ')[0] || 'there') + '.'"></h1>
-            <p class="text-sm text-base-muted" x-text="userData?.email || userData?.phone || ''"></p>
-          </div>
-        </div>
-
-        <div class="flex flex-col md:flex-row gap-6">
-
-          <!-- Sidebar nav -->
-          <div class="w-full md:w-52 flex-shrink-0">
-            <div class="bg-base-card rounded-2xl border border-base-border p-4 sticky top-20">
-              <div class="flex items-center gap-3 mb-5 pb-4 border-b border-base-border">
-                <div class="w-12 h-12 rounded-full bg-base-success flex items-center justify-center text-white font-bold text-base"
-                     x-text="userData?.name?.charAt(0)?.toUpperCase() || 'U'"></div>
-                <div class="min-w-0">
-                  <p class="font-bold text-sm text-base-fg truncate" x-text="userData?.name || 'User'"></p>
-                  <p class="text-[11px] text-base-muted truncate" x-text="userData?.phone || ''"></p>
-                </div>
-              </div>
-              <nav class="space-y-1">
-                <button @click="dashTab = 'orders'"
-                  class="dash-nav-item w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-base-muted flex items-center gap-2"
-                  :class="{'active': dashTab === 'orders'}">
-                  <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                  My Orders
-                </button>
-                <button @click="dashTab = 'profile'"
-                  class="dash-nav-item w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-base-muted flex items-center gap-2"
-                  :class="{'active': dashTab === 'profile'}">
-                  <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                  Edit Profile
-                </button>
-                <button @click="dashTab = 'addresses'"
-                  class="dash-nav-item w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-base-muted flex items-center gap-2"
-                  :class="{'active': dashTab === 'addresses'}">
-                  <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                  Saved Addresses
-                </button>
-              </nav>
-              <button @click="signOut()"
-                class="w-full mt-5 px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-smooth flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                Log Out
-              </button>
-            </div>
-          </div>
-
-          <!-- Main content area -->
-          <div class="flex-1 min-w-0">
-
-            <!-- ORDERS TAB -->
-            <div x-show="dashTab === 'orders'">
-              <h2 class="font-display text-xl font-semibold text-base-fg mb-6">My Orders</h2>
-              <div x-show="ordersLoading" class="text-center py-16">
-                <div class="w-8 h-8 border-2 border-base-border border-t-base-fg rounded-full animate-spin mx-auto"></div>
-              </div>
-              <div x-show="!ordersLoading && orders.filter(o => !o.hidden).length === 0" class="text-center py-16 bg-base-card rounded-2xl border border-base-border">
-                <svg class="w-12 h-12 text-base-border mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-                <p class="text-base-muted font-medium">No orders yet</p>
-                <button @click="goHome()" class="mt-4 text-sm text-base-accent underline">Start Shopping</button>
-              </div>
-              <div class="space-y-4">
-                <template x-for="order in orders.filter(o => !o.hidden)" :key="order.id">
-                  <div class="bg-base-card rounded-2xl border border-base-border p-4 space-y-3">
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <p class="text-sm font-bold text-base-fg" x-text="'Order #' + order.order_number"></p>
-                        <p class="text-xs text-base-muted" x-text="new Date(order.created_at).toLocaleDateString('en-BD', {year:'numeric',month:'short',day:'numeric'})"></p>
-                      </div>
-                      <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
-                        :class="{
-                          'bg-amber-50 text-amber-600': order.status === 'pending',
-                          'bg-blue-50 text-blue-600': order.status === 'confirmed',
-                          'bg-indigo-50 text-indigo-600': order.status === 'packaged',
-                          'bg-purple-50 text-purple-600': order.status === 'shipped',
-                          'bg-green-50 text-green-600': order.status === 'delivered',
-                          'bg-red-50 text-red-600': order.status === 'cancelled'
-                        }"
-                        x-text="order.status.charAt(0).toUpperCase() + order.status.slice(1)"></span>
-                    </div>
-
-                    <!-- Cancelled banner -->
-                    <template x-if="order.status === 'cancelled'">
-                      <div class="px-3 py-2 rounded-xl bg-red-50 border border-red-100 text-xs text-red-600">
-                        <span class="font-semibold">Order Cancelled</span>
-                        <template x-if="order.cancelled_at">
-                          <span x-text="' on ' + new Date(order.cancelled_at).toLocaleDateString('en-BD', {year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})"></span>
-                        </template>
-                        <template x-if="order.cancel_note">
-                          <span x-text="' — ' + order.cancel_note"></span>
-                        </template>
-                      </div>
-                    </template>
-
-                    <!-- Status timeline (non-cancelled) -->
-                    <template x-if="order.status !== 'cancelled'">
-                      <div class="space-y-0">
-                        <template x-for="(st, si) in ['pending','confirmed','packaged','shipped','delivered']" :key="st">
-                          <div class="tl-item" :class="{'completed': ['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) > si, '': ['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) === si}">
-                            <div class="tl-dot"
-                              :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) > si ? 'completed' : (['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) === si ? 'active' : 'pending')">
-                              <template x-if="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) > si">
-                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                              </template>
-                            </div>
-                            <p class="text-xs font-medium" :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status) >= si ? 'text-base-fg' : 'text-base-muted'" x-text="st.charAt(0).toUpperCase() + st.slice(1)"></p>
-                          </div>
-                        </template>
-                      </div>
-                    </template>
-
-                    <!-- Order items -->
-                    <div x-show="order.items && order.items.length" class="space-y-2">
-                      <template x-for="item in (order.items || [])" :key="item.id">
-                        <div class="flex items-center gap-3 p-2 rounded-xl bg-base-surface/50">
-                          <img :src="item.variant_image || ''" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect fill=%22%23E5E3DE%22 width=%2240%22 height=%2240%22/></svg>'">
-                          <div class="flex-1 min-w-0">
-                            <p class="text-xs font-semibold text-base-fg truncate" x-text="item.product_title"></p>
-                            <p class="text-[11px] text-base-muted" x-text="(item.variant_label || 'Standard') + ' × ' + item.qty"></p>
-                          </div>
-                          <p class="text-xs font-bold text-base-fg flex-shrink-0" x-text="formatPrice(item.price_at_purchase * item.qty)"></p>
-                        </div>
-                      </template>
-                    </div>
-
-                    <!-- Pricing breakdown -->
-                    <div class="border-t border-base-border pt-2 space-y-1 text-xs">
-                      <div class="flex justify-between"><span class="text-base-muted">Subtotal</span><span class="font-semibold" x-text="formatPrice(order.subtotal)"></span></div>
-                      <div class="flex justify-between"><span class="text-base-muted">Delivery</span><span class="font-semibold" x-text="formatPrice(order.delivery_fee)"></span></div>
-                      <template x-if="order.discount_amount > 0">
-                        <div class="flex justify-between"><span class="text-base-success">Discount</span><span class="font-semibold text-base-success" x-text="'-' + formatPrice(order.discount_amount)"></span></div>
-                      </template>
-                      <div class="flex justify-between font-bold text-sm"><span>Total</span><span x-text="formatPrice(order.total)"></span></div>
-                    </div>
-
-                    <!-- Shipping address -->
-                    <template x-if="order.shipping_snapshot">
-                      <div class="border-t border-base-border pt-2 text-xs text-base-muted">
-                        <p class="font-semibold text-base-fg mb-1">Shipping Address</p>
-                        <p x-text="order.shipping_snapshot?.name || ''"></p>
-                        <p x-text="order.shipping_snapshot?.phone || ''"></p>
-                        <p x-text="(order.shipping_snapshot?.address || '') + ', ' + (order.shipping_snapshot?.upazilla || '') + ', ' + (order.shipping_snapshot?.district || '')"></p>
-                      </div>
-                    </template>
-
-                    <!-- Remove from history -->
-                    <div class="border-t border-base-border pt-3 mt-3">
-                      <button @click="hideOrderFromHistory(order.id)"
-                        class="text-xs text-base-muted hover:text-red-500 transition-smooth flex items-center gap-1.5 opacity-60 hover:opacity-100">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59M21 21l-3.59-3.59"/>
-                        </svg>
-                        Remove from my history
-                      </button>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <!-- PROFILE TAB -->
-            <div x-show="dashTab === 'profile'">
-              <h2 class="font-display text-xl font-semibold text-base-fg mb-6">Edit Profile</h2>
-              <div class="bg-base-card rounded-2xl border border-base-border p-6 space-y-4 max-w-lg">
-                <div>
-                  <label class="block text-xs font-semibold text-base-muted mb-1.5">Full Name</label>
-                  <input x-model="userData.name" type="text" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input">
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-base-muted mb-1.5">Phone</label>
-                  <input x-model="userData.phone" type="tel" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input" disabled>
-                  <p class="text-[11px] text-base-muted mt-1">Phone number cannot be changed</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-base-muted mb-1.5">Email</label>
-                  <input x-model="userData.email" type="email" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input">
-                </div>
-                <button @click="saveProfile()" class="w-full py-2.5 rounded-xl bg-base-fg text-white text-sm font-semibold hover:bg-base-fg/90 transition-smooth btn-press">Save Changes</button>
-              </div>
-            </div>
-
-            <!-- ADDRESSES TAB -->
-            <div x-show="dashTab === 'addresses'">
-              <div class="flex items-center justify-between mb-6">
-                <h2 class="font-display text-xl font-semibold text-base-fg">Saved Addresses</h2>
-                <button @click="showAddAddr = true" class="px-4 py-2 rounded-xl bg-base-success/10 text-base-success text-sm font-semibold hover:bg-base-success/20 transition-smooth">+ Add New</button>
-              </div>
-              <div x-show="savedAddresses.length === 0" class="text-center py-12 bg-base-card rounded-2xl border border-base-border">
-                <svg class="w-10 h-10 text-base-border mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <p class="text-base-muted text-sm font-medium">No saved addresses</p>
-                <button @click="showAddAddr = true" class="mt-3 text-sm text-base-accent underline">Add your first address</button>
-              </div>
-              <div class="space-y-3">
-                <template x-for="addr in savedAddresses" :key="addr.id">
-                  <div class="bg-base-card rounded-2xl border border-base-border p-4">
-                    <div class="flex items-start justify-between gap-3">
-                      <div>
-                        <div class="flex items-center gap-2 mb-1">
-                          <span class="text-sm font-bold text-base-fg" x-text="addr.label"></span>
-                          <span x-show="addr.is_default" class="text-[10px] font-semibold bg-base-success/10 text-base-success px-2 py-0.5 rounded-full">Default</span>
-                        </div>
-                        <p class="text-sm text-base-fg" x-text="addr.name"></p>
-                        <p class="text-xs text-base-muted" x-text="addr.phone"></p>
-                        <p class="text-xs text-base-muted mt-0.5" x-text="(addr.details || '') + ', ' + (addr.upazilla || '') + ', ' + (addr.district || '')"></p>
-                      </div>
-                      <div class="flex items-center gap-1.5">
-                        <button x-show="!addr.is_default" @click="setDefaultAddress(addr.id)" class="text-xs text-base-accent font-medium hover:underline">Set Default</button>
-                        <button @click="deleteAddress(addr.id)" class="text-xs text-red-400 font-medium hover:text-red-600">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-          </div><!-- /main content -->
-        </div><!-- /flex -->
-      </div><!-- /max-w -->
-    </div><!-- /account page view -->
 
   </main>
 
@@ -2296,6 +2080,7 @@
         </template>
       </div>
 
+      <!-- Cloudflare Turnstile removed from here — now on shipping details page -->
       <!-- Friction Checkbox -->
       <div class="px-5">
         <label class="flex items-start gap-3 bg-base-surface p-3.5 rounded-xl border border-base-border cursor-pointer select-none my-3">
@@ -2344,7 +2129,8 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="scale-100 opacity-100"
          x-transition:leave-end="scale-95 opacity-0"
-         class="relative w-full max-w-md mx-4 bg-base-card rounded-2xl shadow-2xl flex flex-col overflow-hidden h-[90vh] max-h-[600px]">
+         class="relative w-full bg-base-card rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+             :class="isLoggedIn ? 'max-w-5xl h-[85vh]' : 'max-w-md mx-4 h-[90vh] max-h-[600px] overflow-y-auto'">
 
       <!-- Header -->
       <div class="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-base-border">
@@ -2426,93 +2212,22 @@
                     </span>
                     <svg class="w-4 h-4 text-base-muted transition-smooth" :style="guestOrderHistoryOpen ? 'transform:rotate(180deg)' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                   </button>
-                  <div x-show="guestOrderHistoryOpen" x-transition class="space-y-3 mb-3">
+                  <div x-show="guestOrderHistoryOpen" x-transition class="space-y-2 mb-3">
                     <template x-for="order in orders" :key="order.id">
-                      <div class="bg-base-surface rounded-xl border border-base-border overflow-hidden">
-                        <!-- Header: Order number + status badge + date -->
-                        <div class="p-3">
-                          <div class="flex items-center justify-between mb-1">
-                            <span class="font-bold text-xs text-base-fg" x-text="order.id"></span>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                                  :class="{
-                                    'bg-amber-100 text-amber-700': order.status === 'pending',
-                                    'bg-blue-100 text-blue-700': order.status === 'confirmed',
-                                    'bg-purple-100 text-purple-700': order.status === 'packaged',
-                                    'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(order.status),
-                                    'bg-red-100 text-red-600': order.status === 'cancelled'
-                                  }"
-                                  x-text="order.status || 'pending'"></span>
-                          </div>
-                          <p class="text-[11px] text-base-muted" x-text="order.date"></p>
+                      <div class="bg-base-surface rounded-xl border border-base-border p-3">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="font-bold text-xs text-base-fg" x-text="'#' + order.id"></span>
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                                :class="{
+                                  'bg-amber-100 text-amber-700': order.status === 'pending',
+                                  'bg-blue-100 text-blue-700': order.status === 'confirmed',
+                                  'bg-purple-100 text-purple-700': order.status === 'packaged',
+                                  'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(order.status),
+                                  'bg-red-100 text-red-600': order.status === 'cancelled'
+                                }"
+                                x-text="order.status || 'pending'"></span>
                         </div>
-                        <!-- Status timeline -->
-                        <div class="px-3 pb-2">
-                          <div x-show="order.status === 'cancelled'" class="flex items-center gap-2 px-2 py-1.5 bg-red-50 rounded-lg">
-                            <svg class="w-3 h-3 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            <span class="text-[10px] font-semibold text-red-600">This order has been cancelled.</span>
-                          </div>
-                          <div x-show="order.status !== 'cancelled'" class="flex items-center gap-0">
-                            <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="'go-'+order.id+'-'+step">
-                              <div class="flex items-center flex-1 last:flex-none">
-                                <div class="flex flex-col items-center">
-                                  <div class="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold"
-                                       :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') >= idx
-                                         ? 'bg-base-success text-white'
-                                         : 'bg-base-border text-base-muted'">
-                                    <svg x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') > idx"
-                                         class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                  </div>
-                                  <span class="text-[8px] mt-0.5 text-center capitalize leading-tight"
-                                        :class="order.status === step ? 'font-bold text-base-fg' : 'text-base-muted'"
-                                        x-text="step"></span>
-                                </div>
-                                <div x-show="idx < 4" class="flex-1 h-0.5 mx-0.5 mb-2"
-                                     :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(order.status || 'pending') > idx
-                                       ? 'bg-base-success' : 'bg-base-border'"></div>
-                              </div>
-                            </template>
-                          </div>
-                        </div>
-                        <!-- Items list with thumbnails -->
-                        <div x-show="order.items && order.items.length > 0" class="border-t border-base-border px-3 py-2">
-                          <template x-for="item in (order.items || [])" :key="'gi-'+order.id+'-'+(item.id || item.product_id)">
-                            <div class="flex items-center gap-2 py-1">
-                              <div class="w-8 h-8 rounded-lg overflow-hidden bg-base-border flex-shrink-0">
-                                <img :src="item.details?.image || item.variant_image || ''"
-                                     :alt="item.details?.name || item.product_title"
-                                     class="w-full h-full object-cover"
-                                     onerror="this.style.display='none'">
-                              </div>
-                              <div class="flex-1 min-w-0">
-                                <p class="text-[11px] font-medium text-base-fg truncate" x-text="item.details?.name || item.product_title"></p>
-                                <p class="text-[10px] text-base-muted" x-text="(item.details?.variant || item.variant_label || '') + ' × ' + item.qty"></p>
-                              </div>
-                              <p class="text-[11px] font-bold text-base-fg flex-shrink-0" x-text="formatPrice((item.details?.price || item.price_at_purchase) * item.qty)"></p>
-                            </div>
-                          </template>
-                        </div>
-                        <!-- Pricing breakdown -->
-                        <div class="border-t border-base-border px-3 py-2 space-y-1 text-[11px]">
-                          <div class="flex justify-between"><span class="text-base-muted">Subtotal</span><span x-text="formatPrice(order.subtotal || order.total)"></span></div>
-                          <div class="flex justify-between" x-show="(order.delivery || 0) > 0"><span class="text-base-muted">Delivery</span><span x-text="formatPrice(order.delivery || 0)"></span></div>
-                          <div class="flex justify-between text-base-success" x-show="(order.delivery || 0) === 0"><span>Delivery</span><span>Free</span></div>
-                          <div class="flex justify-between text-base-success" x-show="(order.discount || 0) > 0"><span>Discount</span><span x-text="'-' + formatPrice(order.discount || 0)"></span></div>
-                          <div class="flex justify-between font-bold border-t border-base-border pt-1"><span>Total</span><span x-text="formatPrice(order.total)"></span></div>
-                        </div>
-                        <!-- Shipping address -->
-                        <div x-show="order.shipping" class="border-t border-base-border px-3 py-2">
-                          <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-1">Shipped To</p>
-                          <p class="text-[11px] font-semibold text-base-fg" x-text="order.shipping?.name || ''"></p>
-                          <p class="text-[11px] text-base-muted" x-text="order.shipping?.phone || ''"></p>
-                          <p class="text-[11px] text-base-muted" x-text="(order.shipping?.address || '') + (order.shipping?.upazilla ? ', ' + order.shipping.upazilla : '') + (order.shipping?.district ? ', ' + order.shipping.district : '')"></p>
-                        </div>
-                        <!-- Cancellation info -->
-                        <div x-show="order.status === 'cancelled' && order.cancelled_at" class="border-t border-base-border px-3 py-2">
-                          <p class="text-[10px] text-red-500 font-semibold">Cancelled <span x-text="order.cancelled_at || ''"></span></p>
-                          <p x-show="order.cancellation_reason" class="text-[10px] text-base-muted" x-text="'Reason: ' + order.cancellation_reason"></p>
-                        </div>
+                        <p class="text-[11px] text-base-muted" x-text="order.date + ' · ' + (order.items?.length || 0) + ' item(s) · ' + formatPrice(order.total)"></p>
                       </div>
                     </template>
                   </div>
@@ -2525,65 +2240,56 @@
               <button @click="trackGuestOrder()" :disabled="authLoading" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50">Track Status</button>
               <div x-show="trackOrderError" class="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-medium" x-text="trackOrderError"></div>
               <template x-if="trackedOrder">
-                <div class="bg-base-surface rounded-2xl border border-base-border overflow-hidden">
-                  <!-- Header: Order number + status badge -->
-                  <div class="p-4">
-                    <div class="flex justify-between items-center">
-                      <span class="font-bold text-sm text-base-fg" x-text="'#' + trackedOrder.order.order_number"></span>
-                      <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                            :class="{
-                              'bg-amber-100 text-amber-700': trackedOrder.order.status === 'pending',
-                              'bg-blue-100 text-blue-700': trackedOrder.order.status === 'confirmed',
-                              'bg-purple-100 text-purple-700': trackedOrder.order.status === 'packaged',
-                              'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(trackedOrder.order.status),
-                              'bg-red-100 text-red-600': trackedOrder.order.status === 'cancelled'
-                            }"
-                            x-text="trackedOrder.order.status"></span>
-                    </div>
-                    <p x-show="trackedOrder.order.created_at" class="text-[11px] text-base-muted mt-1" x-text="new Date(trackedOrder.order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })"></p>
+                <div class="bg-base-surface rounded-2xl border border-base-border p-4 space-y-4">
+                  <!-- Header -->
+                  <div class="flex justify-between items-center">
+                    <span class="font-bold text-sm text-base-fg" x-text="'#' + trackedOrder.order.order_number"></span>
+                    <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                          :class="{
+                            'bg-amber-100 text-amber-700': trackedOrder.order.status === 'pending',
+                            'bg-blue-100 text-blue-700': trackedOrder.order.status === 'confirmed',
+                            'bg-purple-100 text-purple-700': trackedOrder.order.status === 'packaged',
+                            'bg-base-success/10 text-base-success': ['shipped','delivered'].includes(trackedOrder.order.status),
+                            'bg-red-100 text-red-600': trackedOrder.order.status === 'cancelled'
+                          }"
+                          x-text="trackedOrder.order.status"></span>
                   </div>
-                  <!-- Status timeline -->
-                  <div class="px-4 pb-3">
-                    <div x-show="trackedOrder.order.status === 'cancelled'" class="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl">
-                      <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                      <span class="text-xs font-semibold text-red-600">This order has been cancelled.</span>
+                  <!-- Cancelled banner -->
+                  <div x-show="trackedOrder.order.status === 'cancelled'" class="bg-red-50 border border-red-200 rounded-xl p-2.5">
+                    <div class="flex items-center gap-2">
+                      <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      <span class="text-xs font-bold text-red-600">Order Cancelled</span>
                     </div>
-                    <div x-show="trackedOrder.order.status !== 'cancelled'" class="flex items-center gap-0">
-                      <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="'ts-'+step">
+                  </div>
+                  <!-- Delivery Timeline (rich) -->
+                  <div x-show="trackedOrder.order.status !== 'cancelled'">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Delivery Status</p>
+                    <div class="flex items-center gap-0">
+                      <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="step">
                         <div class="flex items-center flex-1 last:flex-none">
                           <div class="flex flex-col items-center">
                             <div class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
-                                 :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) >= idx
-                                   ? 'bg-base-success text-white'
-                                   : 'bg-base-border text-base-muted'">
-                              <svg x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) > idx"
-                                   class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-                              </svg>
+                                 :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) >= idx ? 'bg-base-success text-white' : 'bg-base-border text-base-muted'">
+                              <svg x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) > idx" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                               <span x-show="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) <= idx" x-text="idx + 1"></span>
                             </div>
                             <span class="text-[9px] mt-1 text-center capitalize leading-tight"
-                                  :class="trackedOrder.order.status === step ? 'font-bold text-base-fg' : 'text-base-muted'"
-                                  x-text="step"></span>
+                                  :class="trackedOrder.order.status === step ? 'font-bold text-base-fg' : 'text-base-muted'" x-text="step"></span>
                           </div>
                           <div x-show="idx < 4" class="flex-1 h-0.5 mx-1 mb-3"
-                               :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) > idx
-                                 ? 'bg-base-success' : 'bg-base-border'"></div>
+                               :class="['pending','confirmed','packaged','shipped','delivered'].indexOf(trackedOrder.order.status) > idx ? 'bg-base-success' : 'bg-base-border'"></div>
                         </div>
                       </template>
                     </div>
                   </div>
-                  <!-- Items list with thumbnails -->
-                  <div x-show="trackedOrder.items && trackedOrder.items.length > 0" class="border-t border-base-border px-4 py-3">
+                  <!-- Items -->
+                  <div x-show="trackedOrder.items && trackedOrder.items.length > 0">
                     <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Items</p>
                     <div class="space-y-2">
-                      <template x-for="(item, idx) in (trackedOrder.items || [])" :key="'ti-'+idx">
+                      <template x-for="(item, idx) in (trackedOrder.items || [])" :key="'gti-'+idx">
                         <div class="flex items-center gap-3">
                           <div class="w-10 h-10 rounded-lg overflow-hidden bg-base-border flex-shrink-0">
-                            <img :src="item.variant_image || item.product_image || ''"
-                                 :alt="item.product_title"
-                                 class="w-full h-full object-cover"
-                                 onerror="this.style.display='none'">
+                            <img :src="item.variant_image || ''" :alt="item.product_title" class="w-full h-full object-cover" onerror="this.style.display='none'">
                           </div>
                           <div class="flex-1 min-w-0">
                             <p class="text-xs font-medium text-base-fg truncate" x-text="item.product_title"></p>
@@ -2594,26 +2300,21 @@
                       </template>
                     </div>
                   </div>
-                  <!-- Pricing breakdown -->
-                  <div class="border-t border-base-border px-4 py-3 space-y-1 text-xs">
+                  <!-- Price breakdown -->
+                  <div class="border-t border-base-border pt-2 space-y-1 text-xs">
                     <div class="flex justify-between"><span class="text-base-muted">Subtotal</span><span x-text="formatPrice(trackedOrder.order.subtotal || trackedOrder.order.total)"></span></div>
-                    <div class="flex justify-between" x-show="(trackedOrder.order.delivery_fee || 0) > 0"><span class="text-base-muted">Delivery</span><span x-text="formatPrice(trackedOrder.order.delivery_fee || 0)"></span></div>
-                    <div class="flex justify-between text-base-success" x-show="(trackedOrder.order.delivery_fee || 0) === 0"><span>Delivery</span><span>Free</span></div>
-                    <div class="flex justify-between text-base-success" x-show="(trackedOrder.order.discount || 0) > 0"><span>Discount</span><span x-text="'-' + formatPrice(trackedOrder.order.discount || 0)"></span></div>
+                    <div class="flex justify-between"><span class="text-base-muted">Delivery</span><span :class="(trackedOrder.order.delivery_fee || 0) === 0 ? 'text-base-success' : ''" x-text="(trackedOrder.order.delivery_fee || 0) === 0 ? 'Free' : formatPrice(trackedOrder.order.delivery_fee || 0)"></span></div>
+                    <template x-if="(trackedOrder.order.discount_amount || 0) > 0">
+                      <div class="flex justify-between text-base-success"><span>Discount</span><span x-text="'-' + formatPrice(trackedOrder.order.discount_amount)"></span></div>
+                    </template>
                     <div class="flex justify-between font-bold border-t border-base-border pt-1"><span>Total</span><span x-text="formatPrice(trackedOrder.order.total)"></span></div>
                   </div>
-                  <!-- Shipping address -->
-                  <div x-show="trackedOrder.order.shipping_name || trackedOrder.order.shipping_address" class="border-t border-base-border px-4 py-3">
+                  <!-- Shipping info -->
+                  <div x-show="trackedOrder.order.shipping_snapshot" class="bg-white rounded-xl p-3 border border-base-border">
                     <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-1">Shipped To</p>
-                    <p class="text-xs font-semibold text-base-fg" x-text="trackedOrder.order.shipping_name || ''"></p>
-                    <p class="text-xs text-base-muted" x-text="trackedOrder.order.shipping_phone || ''"></p>
-                    <p class="text-xs text-base-muted" x-text="(trackedOrder.order.shipping_address || '') + (trackedOrder.order.shipping_upazilla ? ', ' + trackedOrder.order.shipping_upazilla : '') + (trackedOrder.order.shipping_district ? ', ' + trackedOrder.order.shipping_district : '')"></p>
-                  </div>
-                  <!-- Cancellation info -->
-                  <div x-show="trackedOrder.order.status === 'cancelled'" class="border-t border-base-border px-4 py-3">
-                    <p class="text-[10px] text-red-500 font-semibold">This order was cancelled.</p>
-                    <p x-show="trackedOrder.order.cancelled_at" class="text-[10px] text-base-muted" x-text="'Cancelled on ' + new Date(trackedOrder.order.cancelled_at).toLocaleDateString()"></p>
-                    <p x-show="trackedOrder.order.cancellation_reason" class="text-[10px] text-base-muted" x-text="'Reason: ' + trackedOrder.order.cancellation_reason"></p>
+                    <p class="text-xs font-semibold text-base-fg" x-text="trackedOrder.order.shipping_snapshot?.name || ''"></p>
+                    <p class="text-xs text-base-muted" x-text="trackedOrder.order.shipping_snapshot?.phone || ''"></p>
+                    <p class="text-xs text-base-muted" x-text="(trackedOrder.order.shipping_snapshot?.address || '') + (trackedOrder.order.shipping_snapshot?.upazilla ? ', ' + trackedOrder.order.shipping_snapshot.upazilla : '') + (trackedOrder.order.shipping_snapshot?.district ? ', ' + trackedOrder.order.shipping_snapshot.district : '')"></p>
                   </div>
                 </div>
               </template>
@@ -2698,11 +2399,15 @@
                          class="border-t border-base-border p-4 space-y-4">
                       <div>
                         <p class="text-[10px] font-bold uppercase tracking-wider text-base-muted mb-2">Delivery Status</p>
-                        <div x-show="order.status === 'cancelled'" class="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl">
-                          <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                          </svg>
-                          <span class="text-xs font-semibold text-red-600">This order has been cancelled.</span>
+                        <!-- Cancelled Order Banner (Req 11) -->
+                        <div x-show="order.status === 'cancelled'" class="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
+                          <div class="flex items-center gap-2 mb-1">
+                            <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-sm font-bold text-red-600">Order Cancelled</span>
+                          </div>
+                          <p class="text-xs text-red-500">This order has been cancelled. If you believe this is an error, please contact support.</p>
                         </div>
                         <div x-show="order.status !== 'cancelled'" class="flex items-center gap-0">
                           <template x-for="(step, idx) in ['pending','confirmed','packaged','shipped','delivered']" :key="step">
@@ -2766,6 +2471,13 @@
                         <p class="text-xs font-semibold text-base-fg" x-text="order.shipping?.name || ''"></p>
                         <p class="text-xs text-base-muted" x-text="order.shipping?.phone || ''"></p>
                         <p class="text-xs text-base-muted" x-text="(order.shipping?.address || '') + (order.shipping?.upazilla ? ', ' + order.shipping.upazilla : '') + (order.shipping?.district ? ', ' + order.shipping.district : '')"></p>
+                      </div>
+                      <!-- Remove from History button (Req 16) -->
+                      <div class="flex justify-end pt-2">
+                        <button @click="hideOrder(order)" class="text-xs text-base-muted hover:text-red-500 transition-smooth flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          Remove from History
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2961,7 +2673,7 @@
         <span x-show="cartItemCount > 0" class="absolute -top-0.5 right-2 w-4 h-4 bg-base-accent text-white text-[8px] font-bold rounded-full flex items-center justify-center" x-text="cartItemCount"></span>
       </button>
       <!-- Account -->
-      <button @click="bottomNavActive = 'account'; isLoggedIn ? (currentView = 'account'; authModalOpen = false) : (authModalOpen = true);" class="flex flex-col items-center gap-1 py-1 transition-smooth" :class="bottomNavActive === 'account' ? 'text-base-accent' : 'text-base-muted hover:text-base-fg'">
+      <button @click="bottomNavActive = 'account'; authModalOpen = true;" class="flex flex-col items-center gap-1 py-1 transition-smooth" :class="bottomNavActive === 'account' ? 'text-base-accent' : 'text-base-muted hover:text-base-fg'">
         <svg class="w-5 h-5" :fill="bottomNavActive === 'account' ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
         <span class="text-[10px] font-medium truncate max-w-[50px]" x-text="isLoggedIn ? (userData?.name || 'Account').split(' ')[0] : 'Login'"></span>
       </button>
@@ -3099,7 +2811,6 @@
         showAddAddr: false,
         newAddr: { label: '', name: '', phone: '', district: '', upazilla: '', details: '' },
         _authInitialized: false,
-        _hiddenOrderIds: [],
 
         /* ---------- Config ---------- */
         // PROMO_CODES removed — now fetched from Supabase promo_codes table
@@ -3112,7 +2823,6 @@
 
         /* ---------- Pagination ---------- */
         productsShown: 20,
-        searchProductsShown: 20,
 
         /* ---------- PDP state ---------- */
         pdpProduct: null,
@@ -3139,6 +2849,7 @@
           uploading: false,
         },
         reviewUploadError: '',
+        showReviewAdmin: false, // DEPRECATED — admin review tools removed (Req 2)
 
         /* ========== COMPUTED ========== */
         get enrichedProducts() {
@@ -3164,18 +2875,17 @@
         get hasMoreProducts() { return this.productsShown < this.enrichedProducts.length; },
         get searchResultsDisplay() {
           return this.filteredProducts.map(p => {
+            const cat = this.allCategories.find(c => c.id === p.category_id);
+            const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
             const variants = this.allVariants.filter(v => v.product_id === p.id && v.is_active);
-            const selectedVariant = variants.length ? variants[0] : null;
-            const price = selectedVariant?.discount_price || selectedVariant?.price || p.base_price;
-            const origPrice = selectedVariant?.discount_price ? selectedVariant.price : null;
-            const discountPct = origPrice ? Math.round((1 - price / origPrice) * 100) : 0;
-            return { ...p, displayPrice: price, origPrice, discountPct, variantCount: variants.length };
-          }).slice(0, this.searchProductsShown);
+            let displayPrice = p.base_price;
+            if (p.has_variations && variants.length) {
+              const effPrices = variants.map(v => v.discount_price && v.discount_price < v.price ? v.discount_price : v.price);
+              displayPrice = Math.min(...effPrices);
+            }
+            return { ...p, category_name: cat?.name || '', displayPrice };
+          }).slice(0, this.productsShown);
         },
-        get searchHasMore() {
-          return this.searchProductsShown < this.filteredProducts.length;
-        },
-        loadMoreSearchResults() { this.searchProductsShown += 20; },
         get searchResultsCount() {
           return this.filteredProducts.length;
         },
@@ -3229,21 +2939,6 @@
             if (!this.rocketNumber.trim() || !this.rocketTrxId.trim()) return false;
           }
           return true;
-        },
-        get isShippingFormValid() {
-          const phoneDigits = (this.shipping.phone || '').replace(/\s/g, '');
-          const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          const altDigits = (this.shipping.altPhone || '').replace(/\s/g, '');
-          return (
-            this.shipping.name.trim().length >= 2 &&
-            /^01[3-9]\d{8}$/.test(phoneDigits) &&
-            !!this.selectedDistrict &&
-            !!this.shipping.upazilla &&
-            this.shipping.address.trim().length >= 5 &&
-            this.shipping.email.trim() && emailRx.test(this.shipping.email.trim()) &&
-            this.turnstileVerified &&
-            (!this.shipping.altPhone.trim() || /^01[3-9]\d{8}$/.test(altDigits))
-          );
         },
         get canFinalConfirm() { return this.finalConfirmCheck; },
         get paymentValidationHint() {
@@ -3377,9 +3072,6 @@
               paymentMethod: o.payment_method,
               status: o.status,
               shipping: o.shipping_snapshot,
-              hidden: false,
-              cancelled_at: o.cancelled_at || null,
-              cancel_note: o.cancel_note || null,
               items: (o.order_items || []).map(oi => ({
                 id: oi.id,
                 product_id: oi.product_id,
@@ -3424,63 +3116,35 @@
           if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
           this._searchDebounceTimer = setTimeout(async () => {
             const q = this.searchQuery.trim();
+
             if (!q) {
               this.searchResultsRaw = [];
               this.filteredProducts = [...this.allProducts];
-              this.searchProductsShown = 20;
+              this.productsShown = 20;
               this.searchActiveCategory = null;
               return;
             }
 
             this.searchLoading = true;
             try {
-              // Find matching category and subcategory IDs from local data (no DB call needed)
-              const ql = q.toLowerCase();
-              const matchingCatIds = this.allCategories
-                .filter(c => c.name.toLowerCase().includes(ql) || (c.slug || '').includes(ql))
-                .map(c => c.id);
-              const matchingSubIds = this.allSubcategories
-                .filter(s => s.name.toLowerCase().includes(ql) || (s.slug || '').includes(ql))
-                .map(s => s.id);
-
-              // Build the OR filter for Supabase
-              let orFilters = [`title.ilike.%${q}%`, `description.ilike.%${q}%`];
-
-              // Fetch from DB
-              const { data: titleData, error } = await supabaseClient
-                .from('products')
-                .select('id, title, main_image, category_id, subcategory_id, base_price, has_variations, is_active, description')
-                .eq('is_active', true)
-                .or(orFilters.join(','))
-                .order('title')
-                .limit(60);
+              const { data, error } = await supabaseClient.rpc('search_catalog', {
+                search_term: q
+              });
               if (error) throw error;
 
-              // Also search by category/subcategory locally (since it's local data)
-              const catMatches = matchingCatIds.length || matchingSubIds.length
-                ? this.allProducts.filter(p =>
-                    matchingCatIds.includes(p.category_id) || matchingSubIds.includes(p.subcategory_id)
-                  )
-                : [];
-
-              // Merge, deduplicate by id
-              const merged = [...(titleData || [])];
-              const existingIds = new Set(merged.map(p => p.id));
-              catMatches.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); });
-
-              this.searchResultsRaw = merged;
+              this.searchResultsRaw = data || [];
+              // Enrich results with category/subcategory names from local data
+              this.searchResultsRaw = (data || []).map(p => {
+                const cat = this.allCategories.find(c => c.id === p.category_id);
+                const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
+                return { ...p, category_name: p.category_name || (cat?.name || ''), subcategory_name: p.subcategory_name || (sub?.name || '') };
+              });
               this._applySearchFilter();
             } catch (e) {
               console.error('Search failed:', e);
-              const ql = q.toLowerCase();
-              this.searchResultsRaw = this.allProducts.filter(p => {
-                const cat = this.allCategories.find(c => c.id === p.category_id);
-                const sub = this.allSubcategories.find(s => s.id === p.subcategory_id);
-                return p.title.toLowerCase().includes(ql)
-                  || (p.description || '').toLowerCase().includes(ql)
-                  || (cat?.name || '').toLowerCase().includes(ql)
-                  || (sub?.name || '').toLowerCase().includes(ql);
-              });
+              this.searchResultsRaw = this.allProducts.filter(p =>
+                p.title.toLowerCase().includes(q.toLowerCase())
+              );
               this._applySearchFilter();
             } finally {
               this.searchLoading = false;
@@ -3523,43 +3187,32 @@
 
         /* ========== GUEST-TO-ACCOUNT SYNC ========== */
         async syncGuestDataToAccount(userId) {
-          // Always run fetchActiveCart after this function, regardless of path
           if (!this.sessionId) {
             await this.fetchActiveCart();
             return;
           }
 
-          // Snapshot guest cart BEFORE merge (from DB state, not local state)
-          // We do NOT trust this.cart here — it may reflect stale pre-login state
-          let hadGuestItems = false;
-          try {
-            const { data: preCheck } = await supabaseClient.rpc('get_cart_items', {
-              p_user_id: null,
-              p_session_id: this.sessionId
-            });
-            hadGuestItems = preCheck && preCheck.items && preCheck.items.length > 0;
-          } catch(e) { /* non-fatal — proceed */ }
+          const guestCartIsEmpty = this.cart.length === 0;
 
           try {
             const { data, error } = await supabaseClient.rpc('sync_guest_to_account', {
               p_user_id: userId,
               p_session_id: this.sessionId
             });
+
             if (error) throw error;
 
-            // Clear guest order history from localStorage — now owned by account
             try { localStorage.removeItem('vibe_guest_orders'); } catch(e) {}
 
-            // Always reload the merged/claimed cart
             await this.fetchActiveCart();
 
-            // Inform user only if there were actual guest items to merge
-            if (hadGuestItems && data?.had_guest_cart) {
+            if (!guestCartIsEmpty && data?.merged) {
               this.showNotification('Your cart items have been saved to your account!');
+            } else if (!guestCartIsEmpty && !data?.merged) {
+              await this.fetchActiveCart();
             }
           } catch (e) {
             console.warn('Guest sync failed (non-fatal):', e.message);
-            // Fallback: load whatever cart exists for this user
             await this.fetchActiveCart();
           }
         },
@@ -3574,10 +3227,6 @@
             const savedShipping = JSON.parse(localStorage.getItem('vibe_shipping') || 'null');
             if (savedShipping) this.shipping = { ...this.shipping, ...savedShipping };
           } catch(e) {}
-          try {
-            const raw = localStorage.getItem('vibe_hidden_order_ids');
-            this._hiddenOrderIds = raw ? JSON.parse(raw) : [];
-          } catch(e) { this._hiddenOrderIds = []; }
           // Restore guest order history before auth check
           this._restoreGuestOrdersFromStorage();
 
@@ -3602,27 +3251,12 @@
               this.userData = null;
               this.orders = [];
               this.savedAddresses = [];
-              this.cart = [];
-              this.activeCartId = null;
-              // Generate fresh session so the post-logout guest has a clean cart
-              try {
-                localStorage.removeItem('vibe_session_id');
-                localStorage.removeItem('vibe_guest_orders');
-              } catch(e) {}
-              this.generateSessionId();
-              await this.fetchActiveCart(); // Creates a fresh empty guest cart
+              await this.fetchActiveCart();
             }
           });
 
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
-          this.$watch('authModalOpen', (val) => {
-            if (val && this.isLoggedIn) {
-              this.authModalOpen = false;
-              this.currentView = 'account';
-              this.bottomNavActive = 'account';
-            }
-          });
           this.$watch('authTab', (newTab, oldTab) => {
             // Only clear errors when the USER manually switches tabs (not programmatic tab switches during auth flows).
             // We detect programmatic switches by checking if authLoading is true.
@@ -3654,10 +3288,8 @@
                 phone: user.user_metadata?.phone || ''
               };
 
-          // Merge guest cart FIRST — this also calls fetchActiveCart internally
           await this.syncGuestDataToAccount(user.id);
 
-          // Then load orders and addresses in parallel
           await Promise.all([
             this.fetchUserOrders(),
             this.fetchSavedAddresses()
@@ -3713,7 +3345,7 @@
 
         /* ========== SEARCH ========== */
         openSearch() { this.searchOpen = true; this.productsShown = 20; this.$nextTick(() => { const el = document.getElementById('main-search'); if (el) el.focus(); }); },
-        closeSearch() { this.searchOpen = false; this.searchQuery = ''; this.filteredProducts = [...this.allProducts]; this.productsShown = 20; this.searchProductsShown = 20; this.searchResultsRaw = []; },
+        closeSearch() { this.searchOpen = false; this.searchQuery = ''; this.filteredProducts = [...this.allProducts]; this.productsShown = 20; },
 
         /* ========== CATEGORY ========== */
         setCategory(catId) {
@@ -4075,27 +3707,18 @@
         },
 
         handleStepClick(step) {
-          // Once order is placed (step 3), lock all navigation
-          if (this.checkoutStep === 3) return;
-          // Step 3 circle itself is always non-navigable
-          if (step === 3) return;
-          // Same step — no action
+          if (this.checkoutStep === 3) return; // Lock navigation after order placed
           if (step === this.checkoutStep) return;
-          // Going back: always allowed (before step 3)
-          if (step < this.checkoutStep) {
-            this.checkoutStep = step;
-            this.checkoutValidationMsg = '';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-          }
-          // Going forward: run validation
-          if (step > this.checkoutStep) {
-            this.goToCheckoutStep(step);
-          }
+          if (step < this.checkoutStep) { this.goToCheckoutStep(step); return; }
+          if (step > this.checkoutStep) { this.goToCheckoutStep(step); }
         },
 
         placeOrder() {
-          if (!this.canPlaceOrder) return;
+          if (!this.canPlaceOrder) {
+            // Trigger validation messages even though button is not disabled
+            this.paymentValidationHint; // Access getter to compute hint
+            return;
+          }
           this.showReconfirmModal();
         },
 
@@ -4258,14 +3881,22 @@
         },
 
         continueShopping() {
-          this.currentView = 'home';
-          this.bottomNavActive = 'home';
-          this.checkoutStep = 1;
           this.filteredProducts = [...this.allProducts];
-          this.cart = [];
-          this.activeCartId = null;
+          this.currentView = 'home';
+          this.checkoutStep = 1;
+          this.selectedPayment = '';
+          this.confirmOrderCheck = false;
+          this.codPolicy1 = false; this.codPolicy2 = false;
+          this.reconfirmModalOpen = false;
+          this.finalConfirmCheck = false;
+          this.processingOrder = false;
+          this.promoApplied = null;
+          this.promoCode = '';
+          this._promoMinOrder = 0;
+          // Reset turnstile for next checkout
+          this.turnstileVerified = false;
+          this.turnstileToken = '';
           window.scrollTo({ top: 0, behavior: 'instant' });
-          this.fetchActiveCart();
         },
 
         /* ========== AUTH ========== */
@@ -4397,8 +4028,9 @@
             if (phoneCheck) {
               this.authError = '';
               this.signInEmail = this.regEmail.trim() || '';
-              this.authSuccessMsg = `This phone number (${this.regPhone}) is already linked to an account. Please sign in.`;
               this.authTab = 0;
+              this.authLoading = false;
+              this.authSuccessMsg = `This phone number (${this.regPhone}) is already linked to an account. Please sign in.`;
               this.$nextTick(() => {
                 const pwField = document.querySelector('input[x-model="signInPassword"]');
                 if (pwField) pwField.focus();
@@ -4415,8 +4047,9 @@
               if (emailCheck) {
                 this.authError = '';
                 this.signInEmail = this.regEmail.trim();
-                this.authSuccessMsg = `This email is already registered. Please sign in.`;
                 this.authTab = 0;
+                this.authLoading = false;
+                this.authSuccessMsg = `This email is already registered. Please sign in.`;
                 this.$nextTick(() => {
                   const pwField = document.querySelector('input[x-model="signInPassword"]');
                   if (pwField) pwField.focus();
@@ -4479,7 +4112,18 @@
         async signOut() {
           try {
             await supabaseClient.auth.signOut();
-            // onAuthStateChange SIGNED_OUT will handle the rest
+            try {
+              localStorage.removeItem('vibe_session_id');
+              localStorage.removeItem('vibe_guest_orders');
+            } catch(e) {}
+            this.isLoggedIn = false;
+            this.userData = null;
+            this.orders = [];
+            this.savedAddresses = [];
+            this.cart = [];
+            this.activeCartId = null;
+            this.generateSessionId();
+            await this.fetchActiveCart();
             this.showNotification('Signed out successfully');
           } catch (e) {
             console.error('Sign out failed:', e);
@@ -4670,20 +4314,9 @@
             if (!raw) return;
             const stored = JSON.parse(raw);
             if (Array.isArray(stored) && stored.length > 0) {
-              this.orders = stored.map(o => ({ ...o, hidden: false }));
+              this.orders = stored;
             }
           } catch(e) { /* malformed JSON — ignore */ }
-        },
-
-        hideOrderFromHistory(orderId) {
-          if (!this._hiddenOrderIds.includes(orderId)) {
-            this._hiddenOrderIds = [...this._hiddenOrderIds, orderId];
-            try { localStorage.setItem('vibe_hidden_order_ids', JSON.stringify(this._hiddenOrderIds)); } catch(e) {}
-            const order = this.orders.find(o => o.id === orderId);
-            if (order) order.hidden = true;
-            this.orders = [...this.orders];
-            this.showNotification('Order removed from history.');
-          }
         },
 
         /* ========== REVIEWS ========== */
@@ -4797,7 +4430,78 @@
           return d.toLocaleDateString('en-BD', { year: 'numeric', month: 'short', day: 'numeric' });
         },
 
+        mockApproveReview() {}, // DEPRECATED — removed per Req 2
 
+        mockDeleteReview() {}, // DEPRECATED — removed per Req 2
+
+        /* ========== HIDE ORDER (Req 16) ========== */
+        async hideOrder(order) {
+          if (!order.dbId || !this.userData?.id) return;
+          try {
+            const { error } = await supabaseClient.rpc('hide_user_order', {
+              p_order_id: order.dbId,
+              p_user_id: this.userData.id
+            });
+            if (error) throw error;
+            this.orders = this.orders.filter(o => o.id !== order.id);
+            this.showNotification('Order removed from history');
+          } catch (e) {
+            console.error('Failed to hide order:', e);
+            this.showNotification('Could not remove order. Try again.');
+          }
+        },
+
+        /* ========== CAN USER WRITE REVIEW (Req 17) ========== */
+        canWriteReview(productId) {
+          if (!this.isLoggedIn) return false;
+          return this.orders.some(o =>
+            o.status === 'delivered' &&
+            o.items?.some(i => i.product_id === productId)
+          );
+        },
+
+        async submitReview(productId) {
+          if (!this.newReview.title.trim() || !this.newReview.body.trim()) {
+            this.reviewUploadError = 'Please fill in the title and review body.';
+            return;
+          }
+          this.newReview.uploading = true;
+          this.reviewUploadError = '';
+          try {
+            const imageUrls = [];
+            for (const file of (this.newReview.imageFiles || [])) {
+              const url = await this.uploadReviewImage(file);
+              imageUrls.push(url);
+            }
+            const reviewData = {
+              product_id: productId,
+              reviewer_name: this.userData?.name || 'Anonymous',
+              reviewer_avatar: this.userData?.avatar_url || '',
+              rating: this.newReview.rating,
+              title: this.newReview.title.trim(),
+              body: this.newReview.body.trim(),
+              variant_label: '',
+              image_urls: imageUrls,
+              is_verified_buyer: true,
+              is_approved: false
+            };
+            const { data, error } = await supabaseClient
+              .from('product_reviews')
+              .insert(reviewData)
+              .select()
+              .single();
+            if (error) throw error;
+            this.reviewSubmitOpen = false;
+            this.newReview = { rating: 5, title: '', body: '', images: [], imageFiles: [], uploading: false };
+            this.showNotification('Review submitted! It will appear after approval.');
+            await this.fetchProductReviews(productId);
+          } catch (e) {
+            console.error('Review submit failed:', e);
+            this.reviewUploadError = e.message || 'Failed to submit review. Please try again.';
+          } finally {
+            this.newReview.uploading = false;
+          }
+        },
 
         async uploadReviewImage(file) {
           const ext = file.name.split('.').pop().toLowerCase();
@@ -4849,16 +4553,6 @@
           window.scrollTo({ top: 0, behavior: 'instant' });
         },
         goHome() { this.currentView = 'home'; this.bottomNavActive = 'home'; this.filteredProducts = [...this.allProducts]; window.scrollTo({ top: 0, behavior: 'instant' }); },
-        goToAccount() {
-          if (!this.isLoggedIn) { this.authModalOpen = true; return; }
-          this.currentView = 'account';
-          this.bottomNavActive = 'account';
-          this.authModalOpen = false;
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          // Refresh data
-          this.fetchUserOrders();
-          this.fetchSavedAddresses();
-        },
         pdpSelectVariant(variant) { this.pdpSelectedVariant = variant; this.pdpMainImageSrc = variant.variant_image || this.pdpProduct?.main_image; },
         pdpSetMainImage(url) { this.pdpMainImageSrc = url; },
         handlePdpAddToCart() {
