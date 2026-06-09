@@ -1523,11 +1523,14 @@
                 Your Saved Addresses
               </label>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <template x-for="(addr, idx) in savedAddresses" :key="idx">
+                <template x-for="addr in savedAddresses" :key="addr.id">
                   <div class="address-card bg-base-card rounded-xl p-3"
                        :class="{'selected': shipping.name === addr.name && shipping.phone === addr.phone}"
-                       @click="useSavedAddress(idx)">
-                    <p class="text-xs font-bold text-base-success mb-1" x-text="addr.label"></p>
+                       @click="useSavedAddressById(addr.id)">
+                    <div class="flex items-center gap-2 mb-1">
+                      <p class="text-xs font-bold text-base-success" x-text="addr.label"></p>
+                      <span x-show="addr.is_default" class="text-[9px] font-bold bg-base-success text-white px-1.5 py-0.5 rounded-full">Default</span>
+                    </div>
                     <p class="text-sm font-medium text-base-fg" x-text="addr.name"></p>
                     <p class="text-xs text-base-muted line-clamp-2" x-text="addr.details"></p>
                   </div>
@@ -1642,14 +1645,6 @@
                 <template x-if="cartDiscount > 0"><div class="flex justify-between"><span class="text-base-success">Discount</span><span class="font-semibold text-base-success" x-text="'-' + formatPrice(cartDiscount)"></span></div></template>
                 <div class="border-t border-base-border pt-2"><div class="flex justify-between"><span class="font-bold text-base-fg">Total</span><span class="font-display font-bold text-lg" x-text="selectedDistrict ? formatPrice(cartTotal) : '—'"></span></div></div>
               </div>
-
-              <button @click="goToCheckoutStep(2)"
-                class="w-full mt-4 py-3 px-6 rounded-xl font-medium transition-smooth btn-press"
-                :class="isShippingFormValid
-                  ? 'bg-base-fg text-white hover:bg-base-fg/90 cursor-pointer'
-                  : 'bg-base-fg/30 text-white/60 cursor-not-allowed'">
-                Continue to Payment
-              </button>
             </div>
           </div>
         </div>
@@ -1797,17 +1792,6 @@
                 <template x-if="cartDiscount > 0"><div class="flex justify-between"><span class="text-base-success">Discount</span><span class="font-semibold text-base-success" x-text="'-' + formatPrice(cartDiscount)"></span></div></template>
                 <div class="border-t border-base-border pt-2"><div class="flex justify-between"><span class="font-bold text-base-fg">Total</span><span class="font-display font-bold text-lg" x-text="formatPrice(cartTotal)"></span></div></div>
               </div>
-              <p x-show="paymentValidationHint && !canPlaceOrder"
-                 class="text-xs text-red-500 font-medium mb-2 text-center"
-                 x-text="paymentValidationHint"></p>
-              <button @click="placeOrder()"
-                :disabled="!canPlaceOrder"
-                class="w-full mt-4 py-3 px-6 rounded-xl font-medium text-sm btn-press"
-                :class="canPlaceOrder
-                  ? 'bg-base-success text-white hover:opacity-90 cursor-pointer'
-                  : 'bg-base-border text-base-muted cursor-not-allowed opacity-50'">
-                Place Order — <span x-text="formatPrice(cartTotal)"></span>
-              </button>
             </div>
           </div>
         </div>
@@ -1952,10 +1936,10 @@
          style="display:none;"
          class="min-h-screen pb-24">
 
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <!-- Page header -->
-        <div class="flex items-center gap-4 mb-8">
+        <div class="flex items-center gap-4 mb-8 sticky top-16 z-30 bg-base-bg/95 backdrop-blur-lg pb-4 border-b border-base-border">
           <button @click="goHome()" class="w-10 h-10 rounded-xl bg-base-surface border border-base-border flex items-center justify-center hover:bg-base-border transition-smooth">
             <svg class="w-5 h-5 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -2225,29 +2209,95 @@
             <div x-show="dashTab === 'addresses'">
               <div class="flex items-center justify-between mb-6">
                 <h2 class="font-display text-xl font-semibold text-base-fg">Saved Addresses</h2>
-                <button @click="showAddAddr = true" class="px-4 py-2 rounded-xl bg-base-success/10 text-base-success text-sm font-semibold hover:bg-base-success/20 transition-smooth">+ Add New</button>
+                <button @click="showAddAddr = !showAddAddr; editingAddrId = null;" class="px-4 py-2 rounded-xl bg-base-success/10 text-base-success text-sm font-semibold hover:bg-base-success/20 transition-smooth" x-text="showAddAddr ? 'Cancel' : '+ Add New'"></button>
               </div>
-              <div x-show="savedAddresses.length === 0" class="text-center py-12 bg-base-card rounded-2xl border border-base-border">
+
+              <!-- Add New Address Form -->
+              <div x-show="showAddAddr" x-transition class="bg-base-card rounded-2xl border border-base-border p-5 mb-6 space-y-4">
+                <h3 class="text-sm font-bold text-base-fg">New Address</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Label *</label><input x-model="newAddr.label" type="text" placeholder="e.g. Home, Office" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Full Name *</label><input x-model="newAddr.name" type="text" placeholder="Full name" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Phone *</label><input x-model="newAddr.phone" type="tel" placeholder="01XXXXXXXXX" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                  <div>
+                    <label class="block text-xs font-semibold text-base-muted mb-1.5">District *</label>
+                    <select x-model="newAddr.district" @change="newAddr.upazilla = ''" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input bg-white">
+                      <option value="">Select District</option>
+                      <template x-for="d in Object.keys(DISTRICT_DATA)" :key="d"><option :value="d" x-text="d"></option></template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-base-muted mb-1.5">Upazilla / Area *</label>
+                    <select x-model="newAddr.upazilla" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input bg-white" :disabled="!newAddr.district">
+                      <option value="">Select Upazilla</option>
+                      <template x-for="u in (DISTRICT_DATA[newAddr.district] || [])" :key="u"><option :value="u" x-text="u"></option></template>
+                    </select>
+                  </div>
+                </div>
+                <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Detailed Address *</label><textarea x-model="newAddr.details" rows="2" placeholder="House, Road, Block, Area..." class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium resize-none checkout-input"></textarea></div>
+                <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Notes <span class="font-normal text-base-muted/60">(optional)</span></label><textarea x-model="newAddr.notes" rows="2" placeholder="Delivery instructions, landmark..." class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium resize-none checkout-input"></textarea></div>
+                <button @click="addAddress()" class="w-full py-2.5 rounded-xl bg-base-success text-white text-sm font-semibold hover:opacity-90 transition-smooth btn-press">Save Address</button>
+              </div>
+
+              <!-- Empty state -->
+              <div x-show="savedAddresses.length === 0 && !showAddAddr" class="text-center py-12 bg-base-card rounded-2xl border border-base-border">
                 <svg class="w-10 h-10 text-base-border mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <p class="text-base-muted text-sm font-medium">No saved addresses</p>
                 <button @click="showAddAddr = true" class="mt-3 text-sm text-base-accent underline">Add your first address</button>
               </div>
+
+              <!-- Address list -->
               <div class="space-y-3">
                 <template x-for="addr in savedAddresses" :key="addr.id">
-                  <div class="bg-base-card rounded-2xl border border-base-border p-4">
-                    <div class="flex items-start justify-between gap-3">
-                      <div>
-                        <div class="flex items-center gap-2 mb-1">
-                          <span class="text-sm font-bold text-base-fg" x-text="addr.label"></span>
-                          <span x-show="addr.is_default" class="text-[10px] font-semibold bg-base-success/10 text-base-success px-2 py-0.5 rounded-full">Default</span>
+                  <div>
+                    <!-- Edit form for this address -->
+                    <div x-show="editingAddrId === addr.id" x-transition class="bg-base-card rounded-2xl border-2 border-base-accent p-5 space-y-4">
+                      <h3 class="text-sm font-bold text-base-fg">Edit Address</h3>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Label *</label><input x-model="editAddr.label" type="text" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                        <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Full Name *</label><input x-model="editAddr.name" type="text" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                        <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Phone *</label><input x-model="editAddr.phone" type="tel" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
+                        <div>
+                          <label class="block text-xs font-semibold text-base-muted mb-1.5">District *</label>
+                          <select x-model="editAddr.district" @change="editAddr.upazilla = ''" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input bg-white">
+                            <option value="">Select District</option>
+                            <template x-for="d in Object.keys(DISTRICT_DATA)" :key="'e-'+d"><option :value="d" x-text="d"></option></template>
+                          </select>
                         </div>
-                        <p class="text-sm text-base-fg" x-text="addr.name"></p>
-                        <p class="text-xs text-base-muted" x-text="addr.phone"></p>
-                        <p class="text-xs text-base-muted mt-0.5" x-text="(addr.details || '') + ', ' + (addr.upazilla || '') + ', ' + (addr.district || '')"></p>
+                        <div>
+                          <label class="block text-xs font-semibold text-base-muted mb-1.5">Upazilla / Area *</label>
+                          <select x-model="editAddr.upazilla" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium checkout-input bg-white" :disabled="!editAddr.district">
+                            <option value="">Select Upazilla</option>
+                            <template x-for="u in (DISTRICT_DATA[editAddr.district] || [])" :key="'eu-'+u"><option :value="u" x-text="u"></option></template>
+                          </select>
+                        </div>
                       </div>
-                      <div class="flex items-center gap-1.5">
-                        <button x-show="!addr.is_default" @click="setDefaultAddress(addr.id)" class="text-xs text-base-accent font-medium hover:underline">Set Default</button>
-                        <button @click="deleteAddress(addr.id)" class="text-xs text-red-400 font-medium hover:text-red-600">Delete</button>
+                      <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Detailed Address *</label><textarea x-model="editAddr.details" rows="2" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium resize-none checkout-input"></textarea></div>
+                      <div><label class="block text-xs font-semibold text-base-muted mb-1.5">Notes <span class="font-normal text-base-muted/60">(optional)</span></label><textarea x-model="editAddr.notes" rows="2" class="w-full px-3 py-2.5 rounded-xl border border-base-border text-sm font-medium resize-none checkout-input"></textarea></div>
+                      <div class="flex gap-3">
+                        <button @click="saveEditedAddress()" class="flex-1 py-2.5 rounded-xl bg-base-success text-white text-sm font-semibold hover:opacity-90 transition-smooth btn-press">Save Changes</button>
+                        <button @click="editingAddrId = null" class="px-4 py-2.5 rounded-xl border border-base-border text-base-muted text-sm font-semibold hover:bg-base-surface transition-smooth">Cancel</button>
+                      </div>
+                    </div>
+                    <!-- Address card display -->
+                    <div x-show="editingAddrId !== addr.id" class="bg-base-card rounded-2xl border border-base-border p-4">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <span class="text-sm font-bold text-base-fg" x-text="addr.label"></span>
+                            <span x-show="addr.is_default" class="text-[10px] font-bold bg-base-success text-white px-2 py-0.5 rounded-full">Default</span>
+                          </div>
+                          <p class="text-sm text-base-fg" x-text="addr.name"></p>
+                          <p class="text-xs text-base-muted" x-text="addr.phone"></p>
+                          <p class="text-xs text-base-muted mt-0.5" x-text="(addr.district || '') + (addr.upazilla ? ', ' + addr.upazilla : '')"></p>
+                          <p class="text-xs text-base-muted mt-0.5" x-text="addr.details"></p>
+                          <p x-show="addr.notes" class="text-xs text-base-muted/70 mt-0.5 italic" x-text="'Note: ' + addr.notes"></p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          <button x-show="!addr.is_default" @click="setDefaultAddress(addr.id)" class="text-xs text-base-accent font-medium hover:underline">Set Default</button>
+                          <button @click="startEditAddress(addr)" class="text-xs text-base-fg font-medium hover:underline">Edit</button>
+                          <button @click="deleteAddress(addr.id)" class="text-xs text-red-400 font-medium hover:text-red-600">Delete</button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2413,7 +2463,7 @@
   <div x-show="authModalOpen && !isLoggedIn" style="display:none;"
        x-transition.opacity.duration.300
        class="fixed inset-0 z-[500] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-base-fg/40 backdrop-blur-sm" @click="authModalOpen = false"></div>
+    <div class="absolute inset-0 bg-base-fg/40 backdrop-blur-sm" @click="authModalOpen = false; clearAuthFields();"></div>
     <div x-show="authModalOpen"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="scale-95 opacity-0"
@@ -2426,7 +2476,7 @@
       <!-- Header -->
       <div class="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-base-border">
         <h2 class="font-display text-lg font-semibold text-base-fg">Welcome</h2>
-        <button @click="authModalOpen = false" class="p-2 rounded-xl hover:bg-base-surface transition-smooth">
+        <button @click="authModalOpen = false; clearAuthFields();" class="p-2 rounded-xl hover:bg-base-surface transition-smooth">
           <svg class="w-5 h-5 text-base-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
@@ -2445,6 +2495,14 @@
           <div class="flex-1 overflow-y-auto custom-scroll px-6 py-5">
             <!-- Sign In -->
             <div x-show="authTab === 0" class="space-y-3">
+              <!-- Already-registered helper message -->
+              <div x-show="authIdentifierMsg" x-transition
+                   class="bg-base-accent/10 border border-base-accent/20 rounded-xl p-3 flex items-start gap-2">
+                <svg class="w-4 h-4 text-base-accent flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-xs font-medium text-base-accent" x-text="authIdentifierMsg"></span>
+              </div>
               <!-- Success message -->
               <div x-show="authSuccessMsg" x-transition
                    class="bg-base-success/10 border border-base-success/30 rounded-xl p-3 flex items-start gap-2">
@@ -2462,8 +2520,8 @@
               <div x-show="signInCooldownRemaining > 0" class="mt-2 text-xs font-mono font-bold text-red-600">
                 Cooldown: <span x-text="signInCooldownRemaining"></span>s
               </div>
-              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Email Address</label><input x-model="signInEmail" type="email" placeholder="you@example.com" @blur="validateSignInEmail()" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="signInEmailError" class="text-xs text-red-500 mt-1" x-text="signInEmailError"></p></div>
-              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><div class="relative"><input :type="showSignInPassword ? 'text' : 'password'" x-model="signInPassword" placeholder="Enter password" autocomplete="current-password" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showSignInPassword = !showSignInPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showSignInPassword ? 'Hide password' : 'Show password'"><svg x-show="!showSignInPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showSignInPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
+              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Email Address</label><input x-model="signInEmail" type="email" placeholder="you@example.com" @blur="validateSignInEmail()" @input="authIdentifierMsg = ''" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"><p x-show="signInEmailError" class="text-xs text-red-500 mt-1" x-text="signInEmailError"></p></div>
+              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><div class="relative"><input :type="showSignInPassword ? 'text' : 'password'" x-model="signInPassword" @input="authIdentifierMsg = ''" placeholder="Enter password" autocomplete="off" data-1p-ignore data-lpignore="true" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showSignInPassword = !showSignInPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showSignInPassword ? 'Hide password' : 'Show password'"><svg x-show="!showSignInPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showSignInPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
               <button @click="handleSignIn()" :disabled="authLoading || signInCooldownUntil > Date.now()" class="w-full py-3 rounded-xl bg-base-fg text-white font-semibold text-sm hover:bg-base-fg/90 transition-smooth btn-press disabled:opacity-50 flex items-center justify-center gap-2">
                 <svg x-show="authLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 <span x-text="authLoading ? 'Signing in...' : 'Sign In'"></span>
@@ -2478,8 +2536,8 @@
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Full Name</label><input x-model="regName" type="text" placeholder="Your full name" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Email Address <span class="font-normal text-base-muted/60">(optional)</span></label><input x-model="regEmail" type="email" placeholder="you@example.com" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
               <div><label class="text-xs font-semibold text-base-muted mb-1 block">Phone Number <span class="text-base-accent">*</span></label><input x-model="regPhone" type="tel" placeholder="01XXXXXXXXX" class="w-full px-4 py-3 rounded-xl border border-base-border text-sm font-medium checkout-input"></div>
-              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><div class="relative"><input :type="showRegPassword ? 'text' : 'password'" x-model="regPassword" placeholder="Create a password" autocomplete="new-password" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showRegPassword = !showRegPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showRegPassword ? 'Hide password' : 'Show password'"><svg x-show="!showRegPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showRegPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
-              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Confirm Password</label><div class="relative"><input :type="showRegConfirmPassword ? 'text' : 'password'" x-model="regConfirmPassword" placeholder="Confirm your password" autocomplete="new-password" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showRegConfirmPassword = !showRegConfirmPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showRegConfirmPassword ? 'Hide password' : 'Show password'"><svg x-show="!showRegConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showRegConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
+              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Password</label><div class="relative"><input :type="showRegPassword ? 'text' : 'password'" x-model="regPassword" placeholder="Create a password" autocomplete="off" data-1p-ignore data-lpignore="true" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showRegPassword = !showRegPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showRegPassword ? 'Hide password' : 'Show password'"><svg x-show="!showRegPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showRegPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
+              <div><label class="text-xs font-semibold text-base-muted mb-1 block">Confirm Password</label><div class="relative"><input :type="showRegConfirmPassword ? 'text' : 'password'" x-model="regConfirmPassword" placeholder="Confirm your password" autocomplete="off" data-1p-ignore data-lpignore="true" class="w-full px-4 py-3 pr-11 rounded-xl border border-base-border text-sm font-medium checkout-input"><button type="button" @click="showRegConfirmPassword = !showRegConfirmPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-base-muted hover:text-base-fg transition-smooth" :aria-label="showRegConfirmPassword ? 'Hide password' : 'Show password'"><svg x-show="!showRegConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg><svg x-show="showRegConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21"/></svg></button></div></div>
               <!-- Error message for register -->
               <div x-show="authError" x-transition class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
                 <svg class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -2971,9 +3029,12 @@
         ordersLoading: false,
         savedAddresses: [],
         showAddAddr: false,
-        newAddr: { label: '', name: '', phone: '', district: '', upazilla: '', details: '' },
+        newAddr: { label: '', name: '', phone: '', district: '', upazilla: '', details: '', notes: '' },
+        editingAddrId: null,
+        editAddr: { label: '', name: '', phone: '', district: '', upazilla: '', details: '', notes: '' },
         _authInitialized: false,
         _hiddenOrderIds: [],
+        _pendingAuthNavigation: null,
         showHiddenOrders: false,
 
         /* ---------- Config ---------- */
@@ -3426,6 +3487,7 @@
             }
           } catch (e) {
             console.warn('Guest sync failed (non-fatal):', e.message);
+            // Safety: always refetch cart even if merge failed
             await this.fetchActiveCart();
           }
         },
@@ -3486,12 +3548,10 @@
           this.$watch('shipping', () => { this.saveToStorage(); }, { deep: true });
           this.$watch('selectedDistrict', () => { this.saveToStorage(); });
           this.$watch('authTab', (newTab, oldTab) => {
-            // Only clear errors when the USER manually switches tabs (not programmatic tab switches during auth flows).
-            // We detect programmatic switches by checking if authLoading is true.
-            if (!this.authLoading) {
-              this.authError = '';
-              this.authSuccessMsg = '';
-            }
+            this.clearAuthFields();
+          });
+          this.$watch('authModalOpen', (isOpen) => {
+            if (isOpen) this.clearAuthFields();
           });
           this.$watch('cartSubtotal', (newVal) => {
             if (this.promoApplied && this._promoMinOrder && newVal < this._promoMinOrder) {
@@ -3524,14 +3584,39 @@
             this.fetchUserOrders(),
             this.fetchSavedAddresses()
           ]);
+
+          // After all auth hydration is done, close modal and navigate if pending
+          if (this._pendingAuthNavigation) {
+            const nav = this._pendingAuthNavigation;
+            this._pendingAuthNavigation = null;
+            this.authModalOpen = false;
+            if (nav !== 'checkout') {
+              this.$nextTick(() => {
+                this.currentView = nav;
+                this.bottomNavActive = 'account';
+              });
+            }
+          }
         },
 
         saveToStorage() {
           try {
             if (this.selectedDistrict) localStorage.setItem('vibe_district', this.selectedDistrict);
+            else localStorage.removeItem('vibe_district');
             const { name, phone, altPhone, email, upazilla, address } = this.shipping;
             localStorage.setItem('vibe_shipping', JSON.stringify({ name, phone, altPhone, email, upazilla, address }));
           } catch (e) { /* localStorage may be unavailable in some browsers */ }
+        },
+
+        clearAuthFields() {
+          this.signInPassword = '';
+          this.regPassword = '';
+          this.regConfirmPassword = '';
+          this.authError = '';
+          this.authIdentifierMsg = '';
+          this.showSignInPassword = false;
+          this.showRegPassword = false;
+          this.showRegConfirmPassword = false;
         },
 
         /* ========== SIDEBAR ========== */
@@ -4164,14 +4249,8 @@
             this.showNotification('Signed in successfully!');
             this.signInEmail = '';
             this.signInPassword = '';
-            this.authModalOpen = false;
-            // Navigate to account page after sign-in (but not if we're in checkout)
-            this.$nextTick(() => {
-              if (this.isLoggedIn && this.currentView !== 'checkout') {
-                this.currentView = 'account';
-                this.bottomNavActive = 'account';
-              }
-            });
+            this._pendingAuthNavigation = this.currentView === 'checkout' ? 'checkout' : 'account';
+            // Don't close modal yet — _handleAuthUser will handle it after merge
           } catch (e) {
             this.signInAttempts++;
             let msg = e.message || 'Sign in failed';
@@ -4275,7 +4354,7 @@
             if (phoneCheck) {
               this.authError = '';
               this.signInEmail = this.regEmail.trim() || '';
-              this.authSuccessMsg = `This phone number (${this.regPhone}) is already linked to an account. Please sign in.`;
+              this.authIdentifierMsg = 'Already registered? Please sign in with your password.';
               this.authTab = 0;
               this.$nextTick(() => {
                 const pwField = document.querySelector('input[x-model="signInPassword"]');
@@ -4293,7 +4372,7 @@
               if (emailCheck) {
                 this.authError = '';
                 this.signInEmail = this.regEmail.trim();
-                this.authSuccessMsg = `This email is already registered. Please sign in.`;
+                this.authIdentifierMsg = 'Already registered? Please sign in with your password.';
                 this.authTab = 0;
                 this.$nextTick(() => {
                   const pwField = document.querySelector('input[x-model="signInPassword"]');
@@ -4328,9 +4407,8 @@
               this.showNotification('Account created successfully!');
             } else if (data.session) {
               this.showNotification(`Welcome to Vibe, ${this.regName.trim().split(' ')[0]}!`);
-              this.authModalOpen = false;
-              this.currentView = 'account';
-              this.bottomNavActive = 'account';
+              this._pendingAuthNavigation = this.currentView === 'checkout' ? 'checkout' : 'account';
+              // Don't close modal — _handleAuthUser will handle it after merge
               await this._handleAuthUser(data.session.user);
             }
 
@@ -4341,8 +4419,8 @@
             if (msg.includes('already registered') || msg.includes('User already registered')) {
               msg = 'This email is already registered. Please sign in instead.';
               this.signInEmail = this.regEmail.trim();
+              this.authIdentifierMsg = 'Already registered? Please sign in with your password.';
               this.authTab = 0;
-              this.authSuccessMsg = 'Email pre-filled — just enter your password.';
               this.$nextTick(() => {
                 const pwField = document.querySelector('input[x-model="signInPassword"]');
                 if (pwField) pwField.focus();
@@ -4396,9 +4474,19 @@
           this.showNotification('Address loaded');
         },
 
+        useSavedAddressById(addrId) {
+          const addr = this.savedAddresses.find(a => a.id === addrId);
+          if (!addr) return;
+          this.useSavedAddress(this.savedAddresses.indexOf(addr));
+        },
+
         async addAddress() {
-          if (!this.newAddr.label || !this.newAddr.name) return;
+          if (!this.newAddr.label || !this.newAddr.name || !this.newAddr.phone || !this.newAddr.district || !this.newAddr.upazilla || !this.newAddr.details) {
+            this.showNotification('Please fill in all required fields.');
+            return;
+          }
           try {
+            const wasOnlyAddress = this.savedAddresses.length === 0;
             if (this.userData?.id) {
               const { data, error } = await supabaseClient
                 .from('saved_addresses')
@@ -4409,7 +4497,8 @@
                   phone: this.newAddr.phone,
                   district: this.newAddr.district,
                   upazilla: this.newAddr.upazilla,
-                  details: this.newAddr.details
+                  details: this.newAddr.details,
+                  notes: this.newAddr.notes || null
                 })
                 .select()
                 .single();
@@ -4419,11 +4508,54 @@
               this.savedAddresses.push({ ...this.newAddr });
             }
             this.showAddAddr = false;
-            this.newAddr = { label: '', name: '', phone: '', district: '', upazilla: '', details: '' };
+            this.newAddr = { label: '', name: '', phone: '', district: '', upazilla: '', details: '', notes: '' };
             this.showNotification('Address saved!');
+            // Auto-set as default if this is the user's only address
+            if (wasOnlyAddress && this.savedAddresses.length === 1) {
+              await this.setDefaultAddress(this.savedAddresses[0].id);
+            }
           } catch (e) {
             console.error('Add address failed:', e);
             this.showNotification('Failed to save address');
+          }
+        },
+
+        startEditAddress(addr) {
+          this.editingAddrId = addr.id;
+          this.editAddr = { label: addr.label || '', name: addr.name || '', phone: addr.phone || '', district: addr.district || '', upazilla: addr.upazilla || '', details: addr.details || '', notes: addr.notes || '' };
+          this.showAddAddr = false;
+        },
+
+        async saveEditedAddress() {
+          if (!this.editAddr.label || !this.editAddr.name || !this.editAddr.phone || !this.editAddr.district || !this.editAddr.upazilla || !this.editAddr.details) {
+            this.showNotification('Please fill in all required fields.');
+            return;
+          }
+          try {
+            const { error } = await supabaseClient
+              .from('saved_addresses')
+              .update({
+                label: this.editAddr.label,
+                name: this.editAddr.name,
+                phone: this.editAddr.phone,
+                district: this.editAddr.district,
+                upazilla: this.editAddr.upazilla,
+                details: this.editAddr.details,
+                notes: this.editAddr.notes || null
+              })
+              .eq('id', this.editingAddrId)
+              .eq('user_id', this.userData.id);
+            if (error) throw error;
+            // Update local array
+            const idx = this.savedAddresses.findIndex(a => a.id === this.editingAddrId);
+            if (idx >= 0) {
+              this.savedAddresses[idx] = { ...this.savedAddresses[idx], ...this.editAddr };
+            }
+            this.editingAddrId = null;
+            this.showNotification('Address updated!');
+          } catch (e) {
+            console.error('Edit address failed:', e);
+            this.showNotification('Failed to update address.');
           }
         },
 
@@ -4435,9 +4567,8 @@
               p_address_id: addressId
             });
             if (error) throw error;
-            this.savedAddresses = this.savedAddresses.map(a => ({
-              ...a, is_default: a.id === addressId
-            }));
+            // Re-fetch saved addresses from the server to ensure sync
+            await this.fetchSavedAddresses();
             this.showNotification('Default address updated!');
           } catch (e) {
             console.error('Set default address failed:', e);
@@ -4445,7 +4576,9 @@
           }
         },
 
-        async deleteAddress(addressId, idx) {
+        async deleteAddress(addressId) {
+          const idx = this.savedAddresses.findIndex(a => a.id === addressId);
+          if (idx < 0) return;
           const wasDefault = this.savedAddresses[idx]?.is_default;
           try {
             const { error } = await supabaseClient
@@ -4455,7 +4588,8 @@
               .eq('user_id', this.userData.id);
             if (error) throw error;
             this.savedAddresses.splice(idx, 1);
-            if (wasDefault && this.savedAddresses.length === 1) {
+            // If the deleted address was default and there are remaining addresses, promote the first remaining
+            if (wasDefault && this.savedAddresses.length > 0) {
               await this.setDefaultAddress(this.savedAddresses[0].id);
             }
             this.showNotification('Address removed.');
@@ -4739,7 +4873,7 @@
           if (!this.isLoggedIn) { this.authModalOpen = true; return; }
           this.currentView = 'account';
           this.bottomNavActive = 'account';
-          this.authModalOpen = false;
+          this.authModalOpen = false; this.clearAuthFields();
           window.scrollTo({ top: 0, behavior: 'instant' });
           // Refresh data
           this.fetchUserOrders();
@@ -4749,7 +4883,7 @@
           this.bottomNavActive = 'account';
           if (this.isLoggedIn) {
             this.currentView = 'account';
-            this.authModalOpen = false;
+            this.authModalOpen = false; this.clearAuthFields();
             window.scrollTo({ top: 0, behavior: 'instant' });
             this.fetchUserOrders();
             this.fetchSavedAddresses();
